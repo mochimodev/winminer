@@ -8,7 +8,8 @@ https://github.com/mochimodev/mochimo/blob/master/LICENSE.PDF
 
 Use at your own risk.
 
-You may start the miner by double-clicking the executable "mochimo-winminer.exe".  On some systems you may have to configure the system to allow the other executable update-monitor.exe to run.  Please visit the Mochimo Wiki Page for the Headless Windows Miner for more information: http://www.mochiwiki.com/w/index.php/Windows_Miner
+You may start the miner by double-clicking the executable "mochimo-winminer.exe".  On some systems you may have to configure the system
+to allow the other executable update-monitor.exe to run.  Please visit the Mochimo Wiki Page for the Headless Windows Miner for more information: http://www.mochiwiki.com/w/index.php/Windows_Miner
 
 From the command line, you have other options:
 
