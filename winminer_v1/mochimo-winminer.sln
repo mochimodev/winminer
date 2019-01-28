@@ -1,0 +1,31 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio 15
+VisualStudioVersion = 15.0.28307.136
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "mochimo-winminer", "winminer\winminer.vcxproj", "{769FA989-A7A9-4D02-B6D3-8628209450B8}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "update-monitor", "updatemonitor\updatemonitor.vcxproj", "{8EDC3A29-699A-4BC8-B140-8BC8E44D241A}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|x64 = Debug|x64
+		Release|x64 = Release|x64
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{769FA989-A7A9-4D02-B6D3-8628209450B8}.Debug|x64.ActiveCfg = Release|x64
+		{769FA989-A7A9-4D02-B6D3-8628209450B8}.Debug|x64.Build.0 = Release|x64
+		{769FA989-A7A9-4D02-B6D3-8628209450B8}.Release|x64.ActiveCfg = Release|x64
+		{769FA989-A7A9-4D02-B6D3-8628209450B8}.Release|x64.Build.0 = Release|x64
+		{8EDC3A29-699A-4BC8-B140-8BC8E44D241A}.Debug|x64.ActiveCfg = Release|x64
+		{8EDC3A29-699A-4BC8-B140-8BC8E44D241A}.Debug|x64.Build.0 = Release|x64
+		{8EDC3A29-699A-4BC8-B140-8BC8E44D241A}.Release|x64.ActiveCfg = Release|x64
+		{8EDC3A29-699A-4BC8-B140-8BC8E44D241A}.Release|x64.Build.0 = Release|x64
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {09DEFB6A-8696-48B7-9E81-1A7263C017BF}
+	EndGlobalSection
+EndGlobal
