@@ -57,6 +57,7 @@ extern byte Cbits;
 extern int solvedblocks;
 extern byte Running;
 extern byte Trace;
+extern word32 Coreplist[32];
 
 typedef int pid_t;
 
