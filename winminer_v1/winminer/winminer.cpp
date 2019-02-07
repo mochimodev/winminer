@@ -17,7 +17,7 @@
 #include "winminer.h"
 
 char *Addrfile = "maddr.dat";
-char *Corefname = "fullnodes.lst";
+char *Corefname = "startnodes.lst";
 char *WebAddress = "https://www.mochimap.net:8443/";
 
 byte Needcleanup;
@@ -45,7 +45,7 @@ void usage(void)
 		"           -pN set TCP port to N (default: 2095)\n"
 		"           -mFILENAME.ADDR mining address is in file (default: maddr.adr)\n"
 		"           -wURL Pull core ip list file from URL (default: https://www.mochimap.net:8443/)\n"
-		"           -cFILENAME.LST read core ip list from file (default: fullnodes.lst)\n"
+		"           -cFILENAME.LST read core ip list from file (default: startnodes.lst)\n"
 		"           -tN set Trace to N\n"
 		"           -h  this message\n"
 	);
