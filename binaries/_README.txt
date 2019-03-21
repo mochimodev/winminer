@@ -1,7 +1,7 @@
 The MD5HASH for these executables are:
 
-6de50cd3fb8089b110507270d6ccc583  mochimo-winminer.exe
-2fba22c7bbe3badabc6bf3c601211e12  update-monitor.exe
+14b52f155bc582bcc251ad93eacd4125  mochimo-winminer.exe
+258253063d1dedfcea4101423ed3ccac  update-monitor.exe
 
 This software is offered with no warranty, and is subject to the terms and conditions of the license, which can be found here:
 https://github.com/mochimodev/mochimo/blob/master/LICENSE.PDF
