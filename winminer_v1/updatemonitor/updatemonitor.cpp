@@ -19,7 +19,7 @@
 char *Addrfile = "maddr.dat";
 char *Corefname = "startnodes.lst";
 
-word32 Coreplist[32];
+word32 Coreplist[CORELISTLEN];
 byte Needcleanup;
 word32 Port = 2095;
 unsigned Nextcore;
@@ -48,7 +48,9 @@ int main(int argc, char **argv)
 	Needcleanup = 1;
 	read_coreipl(Corefname);
     for (j = 0 ; ; j++) {
-		if (j >= CORELISTLEN) j = 0;
+		if (j >= CORELISTLEN) {
+			j = 0;
+		}
 		ip = &Coreplist[j];
 		if (*ip == 0) continue;
 		set_bnum(Cblocknum, ip);
@@ -62,12 +64,18 @@ int main(int argc, char **argv)
 			memcpy(LastCblocknum, Cblocknum, 8);
 			if (cmp64(Cblocknum, LastCblocknum) != 0) printf("\nmemcpy failed.");
 			restartlock = fopen("restart.tmp", "w+b");
-			if (restartlock == NULL) printf("\nCouldn't open restart lock file.");
-			if (restartlock != NULL) fwrite(LastCblocknum, 8, 1, restartlock);
+			if (restartlock == NULL) {
+				printf("\nCouldn't open restart lock file.");
+			} else {
+				fwrite(LastCblocknum, 8, 1, restartlock);
+			}
 			fclose(restartlock);
 			system("copy restart.tmp restart.lck");
 			_unlink("restart.tmp");
-			break;
+
+			// Prepare for next run.
+			Sleep(100);
+			firstupdate = 1;
 		}
 	}
 	if (Needcleanup) WSACleanup();

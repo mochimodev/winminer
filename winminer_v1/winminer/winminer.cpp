@@ -65,6 +65,33 @@ void usage(void)
 	exit(1);
 }
 
+void start_update_monitor_if_not_running() {
+	static STARTUPINFO si = {sizeof(si)};
+	static PROCESS_INFORMATION pi;
+	static bool init = 0;
+	if (init) {
+		DWORD dwExitCode = WaitForSingleObject(pi.hProcess, 0);
+		if (dwExitCode == WAIT_TIMEOUT) {
+			// Process is running;
+			return;
+		} else if (dwExitCode == WAIT_FAILED
+				|| dwExitCode == WAIT_OBJECT_0
+				|| dwExitCode == WAIT_ABANDONED) {
+			printf("update-monitor is not running\n");
+			CloseHandle(pi.hThread);
+			CloseHandle(pi.hProcess);
+		}
+	}
+
+	if (CreateProcess(NULL, "update-monitor.exe", NULL, NULL, TRUE, 0, NULL, NULL, &si, &pi)) {
+		printf("update-monitor started\n");
+		init = 1;
+	} else {
+		printf("Failed to start update-monitor.exe\n");
+	}
+}
+
+
 int main(int argc, char **argv)
 {
 	int j, status;
@@ -176,7 +203,7 @@ restart:
 				break;
 			}
 		}
-		system("start /B update-monitor.exe");
+		start_update_monitor_if_not_running();
 		printf("\nTrace: About to Start Miner.");
 		if (miner("candidate.tmp", "solved.tmp", Addrfile) == VEOK) {
 			solvedblocks++;
