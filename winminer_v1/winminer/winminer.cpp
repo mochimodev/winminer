@@ -22,7 +22,7 @@ char *Addrfile = "maddr.dat";
 char *Corefname = "startnodes.lst";
 char *WebAddress = "https://www.mochimap.net:8443/";
 
-#define USER_AGENT L"Mochimo Winminer/1.2"
+#define USER_AGENT L"Mochimo Winminer/1.3"
 
 byte Needcleanup;
 word32 Port = 2095;
@@ -248,7 +248,7 @@ int main(int argc, char **argv)
 	srand16(time(&stime));
 	srand2(stime, 0, 0);
 
-	printf("\nMochimo Windows Headless Miner version 1.2\n"
+	printf("\nMochimo Windows Headless Miner version 1.3\n"
 		"Mochimo Main Net v2.2 Original Release Date: 10/27/2018\n"
 		"Copyright (c) 2018 by Adequate Systems, LLC."
 		" All Rights Reserved.\n\n"
