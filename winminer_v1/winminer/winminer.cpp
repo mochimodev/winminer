@@ -15,10 +15,14 @@
  */
 
 #include "winminer.h"
+#include <winhttp.h>
+#pragma comment(lib, "winhttp.lib")
 
 char *Addrfile = "maddr.dat";
 char *Corefname = "startnodes.lst";
 char *WebAddress = "https://www.mochimap.net:8443/";
+
+#define USER_AGENT L"Mochimo Winminer/1.2"
 
 byte Needcleanup;
 word32 Port = 2095;
@@ -91,12 +95,121 @@ void start_update_monitor_if_not_running() {
 	}
 }
 
+void download_file(char *url) {
+	printf("Downloading file from %s\n", url);
+	const int max_size = 8192;
+	char local_url[8192];
+	strcpy(local_url, url);
+	url = local_url;
+
+	bool secure = 0;
+	int port = 80;
+	if (memcmp(url, "https://", 8) == 0) {
+		secure = 1;
+		port = 443;
+		url = url + 8;
+	}
+	else if (memcmp(url, "http://", 7) == 0) {
+		secure = 0;
+		url = url + 7;
+	}
+	else {
+		printf("Unsupported URL protocol! Assuming http://\n");
+	}
+
+	char *domainstr = url;
+	wchar_t domain[8192];
+	char *portstr = strstr(url, ":");
+	char *filestr = strstr(url, "/");
+	wchar_t file[8192];
+	if (filestr != NULL) {
+		mbstowcs(file, filestr, 8192);
+		*filestr++ = 0;
+	}
+	if (portstr != NULL) {
+		*portstr++ = 0;
+		port = atoi(portstr);
+		printf("Custom port: %d\n", port);
+	}
+	mbstowcs(domain, domainstr, 8192);
+	wprintf(L"Domain: %s, Port: %d, Secure: %d, File: %s\n", domain, port, secure, file);
+
+	HINTERNET hSession = WinHttpOpen(USER_AGENT, WINHTTP_ACCESS_TYPE_DEFAULT_PROXY, WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, 0);
+	if (!hSession) {
+		printf("WinHttpOpen failed\n");
+		return;
+	}
+	HINTERNET hConnect = WinHttpConnect(hSession, domain, port, 0);
+	if (!hConnect) { 
+		printf("WinHttpConnect failed: Error %u\n", GetLastError());
+		return;
+	}
+	HINTERNET hRequest = WinHttpOpenRequest(hConnect, L"GET", file, NULL, WINHTTP_NO_REFERER, NULL, WINHTTP_FLAG_SECURE);
+	if (!hRequest) {
+		printf("WinHttpOpenRequest failed: Error: %u\n", GetLastError());
+		return;
+	}
+	BOOL res = WinHttpSendRequest(hRequest, WINHTTP_NO_ADDITIONAL_HEADERS, 0, WINHTTP_NO_REQUEST_DATA, 0, 0, 0);
+	if (!res) {
+		printf("WinHttpSendRequest failed: Error: %u\n", GetLastError());
+		return;
+	}
+	res = WinHttpReceiveResponse(hRequest, NULL);
+	if (!res) {
+		printf("WinHttpReceiveResponse failed: Error %u\n", GetLastError());
+		return;
+	}
+
+	HANDLE hFile = CreateFile(Corefname, GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+	DWORD downloaded = 0;
+	void *outbuf = malloc(max_size);
+	if (outbuf == NULL) {
+		printf("Unable to allocate memory\n");
+		return;
+	}
+	for (;;) {
+		DWORD n = 0;
+		if (!WinHttpQueryDataAvailable(hRequest, &n)) {
+			printf("WinHttpQueryDataAvailable failed: Error %u\n", GetLastError());
+		}
+		if (n == 0) {
+			// No more data
+			break;
+		}
+		else if (n > max_size) {
+			n = max_size;
+		}
+		printf("Fetching %u bytes of data\n", n);
+
+		memset(outbuf, 0, max_size);
+		if (!WinHttpReadData(hRequest, (LPVOID)outbuf, n, &downloaded))
+		{
+			printf("WinHttpReadData failed: Error %u\n", GetLastError());
+		}
+		else
+		{
+			DWORD wmWritten;
+			bool fr = WriteFile(hFile, outbuf, n, &wmWritten, NULL);
+			//printf("wmWritten: %u\n", wmWritten);
+			int n = GetLastError();
+			//printf("lasterror = %u\n", n);
+		}
+		//printf("n= %u\n", n);
+	}
+	free(outbuf);
+	CloseHandle(hFile);
+	printf("Downloaded: %u bytes\n", downloaded);
+
+	if (hRequest) WinHttpCloseHandle(hRequest);
+	if (hConnect) WinHttpCloseHandle(hConnect);
+	if (hSession) WinHttpCloseHandle(hSession);
+}
 
 int main(int argc, char **argv)
 {
 	int j, status;
 	time_t stime;
-	FILE *pwrshellscript, *restartlock;
+	FILE *restartlock;
 	time_t now = time(NULL);
 	char *Statusarg;
 
@@ -119,7 +232,7 @@ int main(int argc, char **argv)
 			break;
 		case 'm':  Addrfile = &argv[j][2];
 			break;
-		case 'W': WebAddress = &argv[j][2];
+		case 'w': WebAddress = &argv[j][2];
 			break;
 		case 'c':  Corefname = &argv[j][2];
 			break;
@@ -135,7 +248,7 @@ int main(int argc, char **argv)
 	srand16(time(&stime));
 	srand2(stime, 0, 0);
 
-	printf("\nMochimo Windows Headless Miner version 1.1\n"
+	printf("\nMochimo Windows Headless Miner version 1.2\n"
 		"Mochimo Main Net v2.2 Original Release Date: 10/27/2018\n"
 		"Copyright (c) 2018 by Adequate Systems, LLC."
 		" All Rights Reserved.\n\n"
@@ -160,12 +273,10 @@ restart:
 	_unlink("pullnodelist.ps1");
 	_unlink(Corefname);
 
-	pwrshellscript = fopen("pullnodelist.ps1", "a");
-	if (pwrshellscript != NULL) {
-		fprintf(pwrshellscript, "wget %s%s -Outfile %s", WebAddress, Corefname, Corefname);
-		fclose(pwrshellscript);
-		system("type pullnodelist.ps1 | powershell.exe");
-	}
+	char urlbuf[8192];
+	strcpy_s(urlbuf, 8192, WebAddress);
+	strcat_s(urlbuf, 8192, Corefname);
+	download_file(urlbuf);
 	if (Corefname)
 		printf("\ninit: read_coreipl() returned %d peer IPs\n", read_coreipl(Corefname));
 	
