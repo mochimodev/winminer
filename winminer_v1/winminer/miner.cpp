@@ -10,7 +10,8 @@
 
 #include "winminer.h"
 
-int miner(char *blockin, char *blockout, char *addrfile)
+
+int miner(char *blockin, char *blockout, char *addrfile, Compute_Type ct)
 {
 	BTRAILER bt;
 	FILE *fp;
@@ -59,17 +60,19 @@ int miner(char *blockin, char *blockout, char *addrfile)
 		trigg_solve(bt.mroot, bt.difficulty[0], bt.bnum);
 		printf("\nTrace: Solution state space created.");
 
-		initGPU = trigg_init_gpu(bt.difficulty[0], bt.bnum);
+		initGPU = trigg_init_gpu(bt.difficulty[0], bt.bnum, ct);
+
 		if (initGPU < 1 || initGPU > 64) {
 			printf("\nTrace: unsupported number of GPUs detected -> %d", initGPU);
 			break;
 		}
 
-		printf("\nDetected %d compatible NVIDIA GPUs", initGPU);
+		printf("\nDetected %d compatible GPUs", initGPU);
 		byte testtest[8];
 		for (htime = time(NULL), hcount = 0; ; ) {
 			if (!Running) break;
-			haiku = trigg_generate_gpu(bt.mroot, &hcount);
+			haiku = trigg_generate_gpu(bt.mroot, &hcount, ct);
+			
 			etime = (time(NULL) - htime);
 			if (etime >= 10) {
 				hps = hcount / etime;
@@ -82,11 +85,11 @@ int miner(char *blockin, char *blockout, char *addrfile)
 			if (haiku != NULL) break;
 			if (exists("restart.lck")) {
 				printf("\nNetwork Block Update Detected, Downloading new block to mine.");
-				trigg_free_gpu();
+				trigg_free_gpu(ct);
 				return VERROR;
 			}
 		}
-		trigg_free_gpu();
+		trigg_free_gpu(ct);
 		if (!Running) break;
 
 		Sleep(2);

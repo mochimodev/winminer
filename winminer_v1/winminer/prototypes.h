@@ -8,6 +8,8 @@
  *
 */
 
+#pragma once
+
 /* CRC-16 Function Prototypes */
 word16 crc16(void *buff, int len);
 void crctx(TX *tx);
@@ -76,9 +78,4 @@ void init_seed(void *rndseed, unsigned len);
 int mkwots();
 
 /* Miner Prototype */
-int miner(char *blockin, char *blockout, char *addrfile);
-
-/* GPU Prototypes */
-__host__ int trigg_init_gpu(byte difficulty, byte *blockNumber);
-__host__ void trigg_free_gpu();
-__host__ char *trigg_generate_gpu(byte *mroot, uint32_t *nHaiku);
+int miner(char *blockin, char *blockout, char *addrfile, Compute_Type ct);
