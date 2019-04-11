@@ -55,7 +55,7 @@ extern word32 Coreplist[32];
 
 typedef int pid_t;
 
-#define PVERSION   2
+#define PVERSION   3
 
 #define VEOK        0      /* No error                    */
 #define VERROR      1      /* General error               */
