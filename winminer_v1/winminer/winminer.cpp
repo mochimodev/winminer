@@ -38,19 +38,6 @@ int solvedblocks = 0;
 byte Running = 1;
 byte Trace;
 
-/* IP's of the Fallback Nodes (Original Core Network) */
-/* Only used if no other server can be found.         */
-word32 Coreplist[CORELISTLEN] = {
-   0x0b2a9741,    /* 65.151.42.11 */
-   0x0c2a9741,
-   0x0d2a9741,
-   0x0e2a9741,
-   0x0f2a9741,
-   0x102a9741,
-   0x112a9741,
-   0x122a9741,
-};
-
 void usage(void)
 {
 	printf("\nUsage: mochimo-winminer [-option -option2 . . .]\n"
