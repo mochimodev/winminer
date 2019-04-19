@@ -17,7 +17,7 @@
 #include "winminer.h"
 
 char *Addrfile = "maddr.dat";
-char *Corefname = "startnodes.lst";
+char *Corefname = "fullnodes.lst";
 
 word32 Coreplist[CORELISTLEN];
 byte Needcleanup;

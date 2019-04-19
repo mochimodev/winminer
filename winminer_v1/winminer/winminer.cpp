@@ -19,8 +19,8 @@
 #pragma comment(lib, "winhttp.lib")
 
 char *Addrfile = "maddr.dat";
-char *Corefname = "startnodes.lst";
-char *WebAddress = "https://www.mochimap.net:8443/";
+char *Corefname = "fullnodes.lst";
+char *WebAddress = "https://www.mochimap.net/";
 
 #define USER_AGENT L"Mochimo Winminer/1.4"
 
@@ -61,8 +61,8 @@ void usage(void)
 		"           -aXXX.XXX.XXX.XXX set IP address to pull block from, exammple: 65.151.42.11\n"
 		"           -pN set TCP port to N (default: 2095)\n"
 		"           -mFILENAME.ADDR mining address is in file (default: maddr.adr)\n"
-		"           -wURL Pull core ip list file from URL (default: https://www.mochimap.net:8443/)\n"
-		"           -cFILENAME.LST read core ip list from file (default: startnodes.lst)\n"
+		"           -wURL Pull core ip list file from URL (default: https://www.mochimap.net/)\n"
+		"           -cFILENAME.LST read core ip list from file (default: fullnodes.lst)\n"
 		"           -tN set Trace to N\n"
 		"           -h  this message\n"
 	);
