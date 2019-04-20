@@ -18,6 +18,8 @@
 #include <winhttp.h>
 #pragma comment(lib, "winhttp.lib")
 
+#include "gui.h"
+
 char *Addrfile = "maddr.dat";
 char *Corefname = "startnodes.lst";
 char *WebAddress = "https://www.mochimap.net:8443/";
@@ -212,6 +214,7 @@ int main(int argc, char **argv)
 	FILE *restartlock;
 	time_t now = time(NULL);
 	char *Statusarg;
+	bool gui = true;
 
 #ifdef _WINSOCKAPI_
 	static WORD wsaVerReq;
@@ -238,11 +241,18 @@ int main(int argc, char **argv)
 			break;
 		case 't':  Trace = atoi(&argv[j][2]);
 			break;
+		case 'f':
+			gui = false;
+			break;
 		case 'x':  if (strlen(argv[j]) != 8) break;
 			Statusarg = argv[j];
 			break;
 		default:   usage();
 		}
+	}
+
+	if (gui) {
+		start_gui_thread();
 	}
 
 	srand16(time(&stime));
@@ -296,6 +306,10 @@ restart:
 	for (; Running == 1;) {
 		if ((time(NULL) - now) > 3600) goto restart;
 		for (; Running == 1;) {
+			if (gui) {
+				check_gui_thread_alive();
+			}
+
 			if (exists("restart.lck")) {
 				restartlock = fopen("restart.lck", "rb");
 				if (restartlock != NULL) {
@@ -313,6 +327,7 @@ restart:
 				printf("\nCandidate block downloaded successfully!");
 				break;
 			}
+
 		}
 		start_update_monitor_if_not_running();
 		printf("\nTrace: About to Start Miner.");
@@ -328,6 +343,7 @@ restart:
 			Sleep(15);
 			printf("\nTrace: Completed Main Loop");
 		}
+
 	}
 
 #ifdef _WINSOCKAPI_

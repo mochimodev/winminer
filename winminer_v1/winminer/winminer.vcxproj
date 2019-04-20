@@ -85,6 +85,7 @@
     <CudaCompile Include="trigg.cu" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="gui.h" />
     <ClInclude Include="helper_cuda.h" />
     <ClInclude Include="helper_string.h" />
     <ClInclude Include="prototypes.h" />
@@ -93,6 +94,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="comms.cpp" />
+    <ClCompile Include="gui.cpp" />
     <ClCompile Include="miner.cpp" />
     <ClCompile Include="wots.cpp" />
     <ClCompile Include="rand.cpp" />
