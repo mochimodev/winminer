@@ -16,7 +16,16 @@
 
 #include "winminer.h"
 #include <winhttp.h>
+#include "util.cpp"
+#include "rand.cpp"
+#include "comms.cpp"
+#include "crypto.cpp"
+#include "miner.cpp"
+#include "wots.cpp"
+#include "trigg.cpp"
+
 #pragma comment(lib, "winhttp.lib")
+#pragma comment(lib, "Ws2_32.lib")
 
 char *Addrfile = "maddr.dat";
 char *Corefname = "fullnodes.lst";
@@ -235,7 +244,7 @@ int main(int argc, char **argv)
 	srand16(time(&stime));
 	srand2(stime, 0, 0);
 
-	printf("\nMochimo Windows Headless Miner version 1.4\n"
+	printf("\nMochimo Windows Headless Miner version 1.4.1\n"
 		"Mochimo Main Net v2.3 Original Release Date: 04/07/2019\n"
 		"Copyright (c) 2019 by Adequate Systems, LLC."
 		" All Rights Reserved.\n\n"
