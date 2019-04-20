@@ -17,13 +17,6 @@
 #include "winminer.h"
 
 #include <winhttp.h>
-#include "util.cpp"
-#include "rand.cpp"
-#include "comms.cpp"
-#include "crypto.cpp"
-#include "miner.cpp"
-#include "wots.cpp"
-#include "trigg.cpp"
 
 #pragma comment(lib, "winhttp.lib")
 #pragma comment(lib, "Ws2_32.lib")
@@ -33,6 +26,19 @@
 char *Addrfile = "maddr.dat";
 char *Corefname = "fullnodes.lst";
 char *WebAddress = "https://www.mochimap.net/";
+
+/* IP's of the Fallback Nodes (Original Core Network) */
+/* Only used if no other server can be found.         */
+word32 Coreplist[CORELISTLEN] = {
+   0x332a9741,    /* 65.151.42.11 */
+   0x342a9741,
+   0x352a9741,
+   0x362a9741,
+   0x372a9741,
+   0x382a9741,
+   0x392a9741,
+   0x402a9741,
+};
 
 #define USER_AGENT L"Mochimo Winminer/1.4"
 

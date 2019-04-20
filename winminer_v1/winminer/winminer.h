@@ -49,7 +49,6 @@ extern byte Cbits;
 extern int solvedblocks;
 extern byte Running;
 extern byte Trace;
-extern word32 Coreplist[32];
 
 typedef int pid_t;
 
@@ -85,21 +84,7 @@ typedef int pid_t;
 #define CRC_VAL_PTR(tx)  ((tx)->crc16)
 
 #define CORELISTLEN  32
-
-#if 0
-/* IP's of the Fallback Nodes (Original Core Network) */
-/* Only used if no other server can be found.         */
-static word32 Coreplist[CORELISTLEN] = {
-   0x332a9741,    /* 65.151.42.11 */
-   0x342a9741,
-   0x352a9741,
-   0x362a9741,
-   0x372a9741,
-   0x382a9741,
-   0x392a9741,
-   0x402a9741,
-};
-#endif
+extern word32 Coreplist[CORELISTLEN];
 
 /* SHA-256 Definitions */
 
