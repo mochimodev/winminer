@@ -89,6 +89,7 @@
     <ClInclude Include="gpu_wrapper.h" />
     <ClInclude Include="helper_cuda.h" />
     <ClInclude Include="helper_string.h" />
+    <ClInclude Include="miner.h" />
     <ClInclude Include="prototypes.h" />
     <ClInclude Include="trigg_cl.h" />
     <ClInclude Include="trigg_cuda.h" />

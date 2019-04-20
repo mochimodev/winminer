@@ -9,6 +9,16 @@
 */
 
 #include "winminer.h"
+#include "miner.h"
+#include "gui.h"
+
+uint64_t haikurate = 0;
+uint64_t current_block = 0;
+uint32_t current_diff = 0;
+uint64_t tx_count = 0;
+uint32_t blocks_solved = 0;
+uint32_t num_cuda = 0;
+uint32_t num_opencl = 0;
 
 
 int miner(char *blockin, char *blockout, char *addrfile, Compute_Type ct)
@@ -81,12 +91,21 @@ int miner(char *blockin, char *blockout, char *addrfile, Compute_Type ct)
 				loopcount++;
 				printf("\n\nStatus (solving):  HPS: %luM/h Now Solving: 0x%s  Diff: %d  TX Count: %lu Blocks Solved: %d\n",
 					(unsigned long)hps, bnum2hex(bt.bnum), bt.difficulty[0], (unsigned long)get32(bt.tcount), solvedblocks);
+				haikurate = hps;
+				current_block = *((uint64_t*)bt.bnum);
+				current_diff = bt.difficulty[0];
+				tx_count = (uint64_t)get32(bt.tcount);
+				blocks_solved = solvedblocks;
 			}
 			if (haiku != NULL) break;
 			if (exists("restart.lck")) {
 				printf("\nNetwork Block Update Detected, Downloading new block to mine.");
 				trigg_free_gpu(ct);
 				return VERROR;
+			}
+			if (check_gui_thread_alive() != 1) {
+				printf("\nGUI no longer running, exiting.");
+				Running = 0;
 			}
 		}
 		trigg_free_gpu(ct);

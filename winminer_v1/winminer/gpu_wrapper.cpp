@@ -9,6 +9,7 @@
 */
 
 #include "gpu_wrapper.h"
+#include "miner.h"
 
 int trigg_init_gpu(byte difficulty, byte *blockNumber, Compute_Type ct) {
 	switch (ct) {
@@ -68,10 +69,15 @@ Compute_Type autoselect_compute_type() {
 	int cuda_devices = count_devices(CT_CUDA);
 	int cl_devices = count_devices(CT_OPENCL);
 
+	num_cuda = cuda_devices;
+	num_opencl = cl_devices;
+
 	if (cl_devices > cuda_devices) {
 		printf("Selecting compute type OpenCL\n");
+		num_cuda = 0;
 		return CT_OPENCL;
 	}
 	printf("Selecting compute type CUDA\n");
+	num_opencl = 0;
 	return CT_CUDA;
 }

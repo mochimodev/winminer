@@ -6,7 +6,10 @@
 #include <stdio.h>
 #include <tchar.h>
 
+#include "miner.h"
+
 LRESULT CALLBACK WndProc(HWND, UINT, WPARAM, LPARAM);
+VOID CALLBACK RedrawTimerProc(HWND hWnd, UINT msg, UINT timerId, DWORD dwTime);
 DWORD WINAPI start_gui(LPVOID lpParam);
 
 static TCHAR szWindowClass[] = _T("MochimoGUI");
@@ -14,6 +17,8 @@ static TCHAR szTitle[] = _T("Mochimo Windows Miner");
 
 HANDLE hGUIThread;
 DWORD dwGUIThreadId;
+HBITMAP ui_bitmap;
+HDC ui_hDc;
 
 Gdiplus::Image* ui_image;
 
@@ -31,6 +36,7 @@ int start_gui_thread() {
 		printf("Unable to start GUI Thread\n");
 		return -1;
 	}
+	return 0;
 }
 
 int check_gui_thread_alive() {
@@ -43,7 +49,7 @@ int check_gui_thread_alive() {
 		|| dwExitCode == WAIT_OBJECT_0
 		|| dwExitCode == WAIT_ABANDONED) {
 		printf("GUI no longer running\n");
-		ExitProcess(1);
+		return 0;
 	}
 	return 0;
 }
@@ -55,6 +61,7 @@ DWORD WINAPI start_gui(LPVOID lpParam) {
 	wnd.lpfnWndProc = WndProc;
 	wnd.hInstance = hInstance;
 	wnd.lpszClassName = szWindowClass;
+	wnd.hbrBackground = NULL;
 	RegisterClass(&wnd);
 
 
@@ -91,10 +98,21 @@ DWORD WINAPI start_gui(LPVOID lpParam) {
 	ULONG_PTR gditoken;
 	GdiplusStartup(&gditoken, &gdiplusStartupInput, NULL);
 
+	// Predraw the UI to a bitmap
 	ui_image = new Gdiplus::Image(L"mochiui.png");
+	Gdiplus::Rect gdi_rect(0, 0, 568, 548);
+	HDC hDc = GetDC(hWnd);
+	ui_hDc = CreateCompatibleDC(hDc);
+	ui_bitmap = CreateCompatibleBitmap(hDc, 568, 548);
+	SelectObject(ui_hDc, ui_bitmap);
+	Gdiplus::Graphics ui_gfx(ui_hDc);
+	ui_gfx.DrawImage(ui_image, gdi_rect);
+	
 
 	ShowWindow(hWnd, SW_SHOWDEFAULT);
 
+	// Start 1s timer, to have a WM_TIMER event to trigger redraw in.
+	UINT_PTR timerId = SetTimer(hWnd, NULL, 1000, (TIMERPROC)RedrawTimerProc);
 
 	//Main message loop
 	MSG msg;
@@ -104,8 +122,10 @@ DWORD WINAPI start_gui(LPVOID lpParam) {
 	}
 
 	delete ui_image;
+	DeleteObject(ui_bitmap);
+	DeleteDC(ui_hDc);
 
-	Gdiplus::GdiplusShutdown(gditoken);
+	//Gdiplus::GdiplusShutdown(gditoken);
 
 	return 0;
 }
@@ -121,11 +141,8 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
 		HDC hDc = BeginPaint(hWnd, &ps);
 
 		RECT r = ps.rcPaint;
-		FillRect(hDc, &r, (HBRUSH)(COLOR_WINDOW + 1));
 		
-		Gdiplus::Rect gdi_rect(r.left, r.top, r.right-r.left, r.bottom-r.top);
-		Gdiplus::Graphics ui_gfx(GetDC(hWnd));
-		ui_gfx.DrawImage(ui_image, gdi_rect);
+		BitBlt(hDc, 0, 0, 568, 548, ui_hDc, 0, 0, SRCCOPY);
 
 		SetBkMode(hDc, TRANSPARENT);
 		SetTextColor(hDc, RGB(0, 80, 0));
@@ -137,32 +154,40 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
 		// Column 1
 		put_text(hDc, 139, 140, "Haikurate");
 		put_text(hDc, 183, 156, "MH/s");
-		put_text(hDc, 139, 156, "123456");
+		char buf[20];
+		_itoa(haikurate, buf, 10);
+		put_text(hDc, 139, 156, buf);
 
 		put_text(hDc, 139, 182, "Devices");
 		put_text(hDc, 139, 198, "CUDA:");
-		put_text(hDc, 198, 198, "99");
+		_itoa(num_cuda, buf, 10);
+		put_text(hDc, 198, 198, buf);
 		put_text(hDc, 139, 214, "OpenCL:");
-		put_text(hDc, 198, 214, "99");
+		_itoa(num_opencl, buf, 10);
+		put_text(hDc, 198, 214, buf);
 
 		// Column 2
 		put_text(hDc, 244, 140, "Block");
-		put_text(hDc, 244, 156, "0x12345678");
+		snprintf(buf, 20, "0x%08x", current_block);
+		put_text(hDc, 244, 156, buf);
 
 		put_text(hDc, 244, 182, "Diff");
-		put_text(hDc, 244, 198, "123");
+		_itoa(current_diff, buf, 10);
+		put_text(hDc, 244, 198, buf);
 
 		put_text(hDc, 244, 224, "TX Count");
-		put_text(hDc, 244, 240, "12345678");
+		_itoa(tx_count, buf, 10);
+		put_text(hDc, 244, 240, buf);
 
 		put_text(hDc, 244, 266, "Solved");
-		put_text(hDc, 244, 282, "12345678");
+		_itoa(blocks_solved, buf, 10);
+		put_text(hDc, 244, 282, buf);
 
 
 		DeleteObject(hFont);
 		EndPaint(hWnd, &ps);
 
-		return 0;
+		break;
 	}
 	case WM_KEYDOWN:
 		switch (wParam) {
@@ -182,4 +207,11 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
 	}
 
 	return DefWindowProc(hWnd, msg, wParam, lParam);
+}
+
+VOID CALLBACK RedrawTimerProc(HWND hWnd, UINT msg, UINT timerId, DWORD dwTime) {
+	BOOL res = RedrawWindow(hWnd, NULL, NULL, RDW_INVALIDATE | RDW_INTERNALPAINT);
+	if (res == false) {
+		printf("Redraw window failed!\n");
+	}
 }
