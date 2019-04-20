@@ -8,6 +8,9 @@
  *
 */
 
+#ifndef WINMINERH
+#define WINMINERH
+
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -276,3 +279,6 @@ typedef struct {
 #define RNDSEEDLEN 64
 
 #include "prototypes.h"
+
+
+#endif  /* WINMINERH */
