@@ -16,13 +16,22 @@
 
 #include "winminer.h"
 #include <winhttp.h>
+#include "util.cpp"
+#include "rand.cpp"
+#include "comms.cpp"
+#include "crypto.cpp"
+#include "miner.cpp"
+#include "wots.cpp"
+#include "trigg.cpp"
+
 #pragma comment(lib, "winhttp.lib")
+#pragma comment(lib, "Ws2_32.lib")
 
 #include "gui.h"
 
 char *Addrfile = "maddr.dat";
-char *Corefname = "startnodes.lst";
-char *WebAddress = "https://www.mochimap.net:8443/";
+char *Corefname = "fullnodes.lst";
+char *WebAddress = "https://www.mochimap.net/";
 
 #define USER_AGENT L"Mochimo Winminer/1.4"
 
@@ -40,19 +49,6 @@ int solvedblocks = 0;
 byte Running = 1;
 byte Trace;
 
-/* IP's of the Fallback Nodes (Original Core Network) */
-/* Only used if no other server can be found.         */
-word32 Coreplist[CORELISTLEN] = {
-   0x0b2a9741,    /* 65.151.42.11 */
-   0x0c2a9741,
-   0x0d2a9741,
-   0x0e2a9741,
-   0x0f2a9741,
-   0x102a9741,
-   0x112a9741,
-   0x122a9741,
-};
-
 void usage(void)
 {
 	printf("\nUsage: mochimo-winminer [-option -option2 . . .]\n"
@@ -63,8 +59,8 @@ void usage(void)
 		"           -aXXX.XXX.XXX.XXX set IP address to pull block from, exammple: 65.151.42.11\n"
 		"           -pN set TCP port to N (default: 2095)\n"
 		"           -mFILENAME.ADDR mining address is in file (default: maddr.adr)\n"
-		"           -wURL Pull core ip list file from URL (default: https://www.mochimap.net:8443/)\n"
-		"           -cFILENAME.LST read core ip list from file (default: startnodes.lst)\n"
+		"           -wURL Pull core ip list file from URL (default: https://www.mochimap.net/)\n"
+		"           -cFILENAME.LST read core ip list from file (default: fullnodes.lst)\n"
 		"           -tN set Trace to N\n"
 		"           -h  this message\n"
 	);
@@ -258,7 +254,7 @@ int main(int argc, char **argv)
 	srand16(time(&stime));
 	srand2(stime, 0, 0);
 
-	printf("\nMochimo Windows Headless Miner version 1.4\n"
+	printf("\nMochimo Windows Headless Miner version 1.4.1\n"
 		"Mochimo Main Net v2.3 Original Release Date: 04/07/2019\n"
 		"Copyright (c) 2019 by Adequate Systems, LLC."
 		" All Rights Reserved.\n\n"

@@ -15,9 +15,15 @@
  */
 
 #include "winminer.h"
+#include "util.cpp"
+#include "rand.cpp"
+#include "comms.cpp"
+#include "crypto.cpp"
+
+#pragma comment(lib, "Ws2_32.lib")
 
 char *Addrfile = "maddr.dat";
-char *Corefname = "startnodes.lst";
+char *Corefname = "fullnodes.lst";
 
 word32 Coreplist[CORELISTLEN];
 byte Needcleanup;

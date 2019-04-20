@@ -8,6 +8,9 @@
  *
 */
 
+#ifndef WINMINERH
+#define WINMINERH
+
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -97,14 +100,14 @@ typedef int pid_t;
 /* IP's of the Fallback Nodes (Original Core Network) */
 /* Only used if no other server can be found.         */
 static word32 Coreplist[CORELISTLEN] = {
-   0x0b2a9741,    /* 65.151.42.11 */
-   0x0c2a9741,
-   0x0d2a9741,
-   0x0e2a9741,
-   0x0f2a9741,
-   0x102a9741,
-   0x112a9741,
-   0x122a9741,
+   0x332a9741,    /* 65.151.42.11 */
+   0x342a9741,
+   0x352a9741,
+   0x362a9741,
+   0x372a9741,
+   0x382a9741,
+   0x392a9741,
+   0x402a9741,
 };
 
 /* SHA-256 Definitions */
@@ -276,3 +279,6 @@ typedef struct {
 #define RNDSEEDLEN 64
 
 #include "prototypes.h"
+
+
+#endif  /* WINMINERH */
