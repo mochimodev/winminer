@@ -8,6 +8,9 @@
  *
 */
 
+#ifndef TRIGG_H
+#define TRIGG_H
+
 #define TRIGG_FAIL NULL
 #define T          1
 #define NIL        0
@@ -411,3 +414,5 @@ static FE Frame[][MAXH] = {
 #define FQ(fe, set) ((fe) | (set))
 
 #define TRIGG_CHECK Trigg_check;
+
+#endif

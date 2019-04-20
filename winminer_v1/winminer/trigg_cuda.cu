@@ -1,4 +1,4 @@
-/* trigg.cu CUDA Implementation of Trigg's Algorithm
+/* trigg_cuda.cu CUDA Implementation of Trigg's Algorithm
  *
  * Copyright (c) 2019 by Adequate Systems, LLC.  All Rights Reserved.
  * See LICENSE.PDF   **** NO WARRANTY ****
@@ -9,6 +9,7 @@
 */
 
 #include "winminer.h"
+#include "trigg_cuda.h"
 
 /* Lines 19 through 208 of this file were provided by a third party and are not subject to copyright
  * or ownership claims by Adequate Systems.  These lines represent a CUDA implementation of SHA-256
@@ -414,7 +415,21 @@ byte *bnum;
 int nGPU = 0;
 cudaStream_t streams[64];
 
-__host__ int trigg_init_gpu(byte difficulty, byte *blockNumber) {
+__host__ int count_devices_cuda() {
+	int num_devices;
+	/* Obtain and check system GPU count */
+	cudaGetDeviceCount(&num_devices);
+	cudaError_t err = cudaGetLastError();
+	if (cudaSuccess != err) {
+		fprintf(stderr,
+			"Unable to count CUDA devices, error: (%d) %s.\n",
+			static_cast<int>(err), cudaGetErrorString(err));
+		return 0;
+	}
+	return num_devices;
+}
+
+__host__ int trigg_init_cuda(byte difficulty, byte *blockNumber) {
 	/* Obtain and check system GPU count */
 	checkCudaErrors(cudaGetDeviceCount(&nGPU));
 	if (nGPU < 1 || nGPU>64) return nGPU;
@@ -452,7 +467,7 @@ __host__ int trigg_init_gpu(byte difficulty, byte *blockNumber) {
 	return nGPU;
 }
 
-__host__ void trigg_free_gpu() {
+__host__ void trigg_free_cuda() {
 	/* Free pinned host memory */
 	checkCudaErrors(cudaFreeHost(diff));
 	checkCudaErrors(cudaFreeHost(bnum));
@@ -474,7 +489,7 @@ __host__ void trigg_free_gpu() {
 	}
 }
 
-__host__ char *trigg_generate_gpu(byte *mroot, uint32_t *nHaiku)
+__host__ char *trigg_generate_cuda(byte *mroot, uint32_t *nHaiku)
 {
 	int i;
 

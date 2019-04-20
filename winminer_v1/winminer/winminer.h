@@ -10,6 +10,7 @@
 
 #ifndef WINMINERH
 #define WINMINERH
+#pragma once
 
 #include <stddef.h>
 #include <stdio.h>
@@ -27,22 +28,10 @@
 #include <io.h>
 #include <fcntl.h>
 
-#include "helper_cuda.h"
-#include <cuda_runtime.h>
+#include "types.h"
+#include "gpu_wrapper.h"
 #include "trigg.h"
 
-
-/* Machine-Specific Variable Definitions */
-#ifndef WORD32
-#define WORD32
-typedef unsigned char byte;      /* 8-bit byte */
-typedef unsigned short word16;   /* 16-bit word */
-typedef unsigned int word32;     /* 32-bit word  */
-#endif  /* WORD32 */
-
-#ifdef LONG64
-typedef unsigned long word64;
-#endif  /* LONG64 */
 
 /* Global External Variables List */
 
@@ -97,6 +86,7 @@ typedef int pid_t;
 
 #define CORELISTLEN  32
 
+#if 0
 /* IP's of the Fallback Nodes (Original Core Network) */
 /* Only used if no other server can be found.         */
 static word32 Coreplist[CORELISTLEN] = {
@@ -109,6 +99,7 @@ static word32 Coreplist[CORELISTLEN] = {
    0x392a9741,
    0x402a9741,
 };
+#endif
 
 /* SHA-256 Definitions */
 
@@ -206,6 +197,7 @@ static word16 Crc16table[] = {
 void trigg_solve(byte *link, int diff, byte *bnum);
 byte *trigg_gen(byte *in);
 char *trigg_expand(byte *in, int diff);
+
 
 
 /* Communications Protocol Definitions*/

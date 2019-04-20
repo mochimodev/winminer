@@ -15,6 +15,7 @@
  */
 
 #include "winminer.h"
+
 #include <winhttp.h>
 #include "util.cpp"
 #include "rand.cpp"
@@ -66,6 +67,7 @@ void usage(void)
 	);
 	exit(1);
 }
+
 
 void start_update_monitor_if_not_running() {
 	static STARTUPINFO si = {sizeof(si)};
@@ -299,6 +301,9 @@ restart:
 			"\nyou enter sufficiently random characters when prompted.\n\n");
 		mkwots();
 	}
+
+	Compute_Type ct = autoselect_compute_type();
+
 	for (; Running == 1;) {
 		if ((time(NULL) - now) > 3600) goto restart;
 		for (; Running == 1;) {
@@ -327,7 +332,7 @@ restart:
 		}
 		start_update_monitor_if_not_running();
 		printf("\nTrace: About to Start Miner.");
-		if (miner("candidate.tmp", "solved.tmp", Addrfile) == VEOK) {
+		if (miner("candidate.tmp", "solved.tmp", Addrfile, ct) == VEOK) {
 			solvedblocks++;
 			for (j = 0; j < CORELISTLEN && Running; j++, Nextcore++) {
 				status = send_mblock("solved.tmp");
