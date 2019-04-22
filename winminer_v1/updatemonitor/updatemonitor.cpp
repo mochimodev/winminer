@@ -50,6 +50,7 @@ int main(int argc, char **argv)
 	Needcleanup = 1;
 	read_coreipl(Corefname);
     for (j = 0 ; ; j++) {
+		Sleep(1);
 		if (j >= CORELISTLEN) {
 			j = 0;
 		}
