@@ -8,6 +8,8 @@
 
 #include "miner.h"
 
+#include "resource.h"
+
 LRESULT CALLBACK WndProc(HWND, UINT, WPARAM, LPARAM);
 VOID CALLBACK RedrawTimerProc(HWND hWnd, UINT msg, UINT timerId, DWORD dwTime);
 DWORD WINAPI start_gui(LPVOID lpParam);
@@ -83,7 +85,6 @@ DWORD WINAPI start_gui(LPVOID lpParam) {
 	}
 
 	HRGN hRegion = CreateRoundRectRgn(0, 0, 568, 548, 568, 548);
-	//HRGN hRegion = CreateEllipticRgn(0, 0, 568, 548);
 	SetWindowRgn(hWnd, hRegion, true);
 
 	DWORD dwStyle = GetWindowLong(hWnd, GWL_STYLE);
@@ -99,7 +100,38 @@ DWORD WINAPI start_gui(LPVOID lpParam) {
 	GdiplusStartup(&gditoken, &gdiplusStartupInput, NULL);
 
 	// Predraw the UI to a bitmap
-	ui_image = new Gdiplus::Image(L"mochiui.png");
+	HRSRC rsc = FindResource(NULL, MAKEINTRESOURCE(IDB_BGPNG), _T("PNG"));
+	if (rsc == NULL) {
+		DWORD dwErr = GetLastError();
+		printf("FindResource failed. Error: %lu\n", dwErr);
+		return 0;
+	}
+	HGLOBAL resGlobal = LoadResource(NULL, rsc);
+	void *img = LockResource(resGlobal);
+	DWORD dwSize = SizeofResource(NULL, rsc);
+	if (!dwSize) {
+		printf("Failed to get size of BGPNG\n");
+		return 0;
+	}
+	HGLOBAL resGlobal2 = GlobalAlloc(GMEM_MOVEABLE, dwSize);
+	if (!resGlobal2) {
+		printf("Failed to allocate resGlobal2\n");
+		return 0;
+	}
+	void *buf = GlobalLock(resGlobal2);
+	if (!buf) {
+		printf("GlobalLock failed\n");
+		return 0;
+	}
+	CopyMemory(buf, img, dwSize);
+	IStream *imgStream = NULL;
+	HRESULT hRes = CreateStreamOnHGlobal(resGlobal2, TRUE, &imgStream);
+	if (hRes != S_OK) {
+		printf("CreateStreamOnHGlobal failed\n");
+		return 0;
+	}
+	ui_image = Gdiplus::Image::FromStream(imgStream);
+	imgStream->Release();
 	Gdiplus::Rect gdi_rect(0, 0, 568, 548);
 	HDC hDc = GetDC(hWnd);
 	ui_hDc = CreateCompatibleDC(hDc);

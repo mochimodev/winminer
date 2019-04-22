@@ -238,9 +238,19 @@ __global__ void trigg(uint32_t threads, int *g_found, uint8_t *g_seed)
 	uint8_t seed[16] = { 0 };
 	uint32_t input[16], state[8];
 
+#ifdef CU_DEBUG
+	if (thread == 10) {
+		printf("thread: %d\n", thread);
+		printf("midstate265: "); for (int i = 0; i < 8; i++) { printf("%08x ", c_midstate256[i]); } printf("\n");
+		printf("blockNumber8: "); for (int i = 0; i < 2; i++) { printf("%08x ", c_blockNumber8[i]); } printf("\n");
+		printf("diff: %d\n", c_difficulty);
+		printf("threads: %d\n", threads);
+	}
+#endif
+
 	if (thread <= threads) {
 
-		if (0 < thread <= 131071) { /* Total Permutations, this frame: 131,072 */
+		if (thread <= 131071) { /* Total Permutations, this frame: 131,072 */
 			seed[0] = Z_PREP[(thread & 7)];
 			seed[1] = Z_TIMED[(thread >> 3) & 7];
 			seed[2] = 1;
@@ -249,7 +259,7 @@ __global__ void trigg(uint32_t threads, int *g_found, uint8_t *g_seed)
 			seed[5] = 1;
 			seed[6] = Z_ING[(thread >> 12) & 31];
 		}
-		if (131071 < thread <= 262143) { /* Total Permutations, this frame: 131,072 */
+		if ((131071 < thread) && (thread <= 262143)) { /* Total Permutations, this frame: 131,072 */
 			seed[0] = Z_TIME[(thread & 15)];
 			seed[1] = Z_MASS[(thread >> 4) & 31];
 			seed[2] = 1;
@@ -259,7 +269,7 @@ __global__ void trigg(uint32_t threads, int *g_found, uint8_t *g_seed)
 			seed[6] = 1;
 			seed[7] = Z_AMB[(thread >> 13) & 15];
 		}
-		if (262143 < thread <= 4456447) { /* Total Permutations, this frame: 4,194,304 */
+		if ((262143 < thread) && (thread <= 4456447)) { /* Total Permutations, this frame: 4,194,304 */
 			seed[0] = Z_PREP[(thread & 7)];
 			seed[1] = Z_TIMED[(thread >> 3) & 7];
 			seed[2] = 1;
@@ -268,7 +278,7 @@ __global__ void trigg(uint32_t threads, int *g_found, uint8_t *g_seed)
 			seed[5] = 1;
 			seed[6] = Z_INGINF[(thread >> 17) & 31];
 		}
-		if (4456447 < thread <= 12845055) { /* Total Permutations, this frame: 8,388,608 */
+		if ((4456447 < thread) && (thread <= 12845055)) { /* Total Permutations, this frame: 8,388,608 */
 			seed[0] = 5;
 			seed[1] = Z_NS[(thread & 63)];
 			seed[2] = 1;
@@ -279,7 +289,7 @@ __global__ void trigg(uint32_t threads, int *g_found, uint8_t *g_seed)
 			seed[7] = 1;
 			seed[8] = Z_ADJ[(thread >> 17) & 63];
 		}
-		if (12845055 < thread <= 29622271) { /* Total Permutations, this frame: 16,777,216 */
+		if ((12845055 < thread) && (thread <= 29622271)) { /* Total Permutations, this frame: 16,777,216 */
 			seed[0] = Z_PREP[thread & 7];
 			seed[1] = Z_ADJ[(thread >> 3) & 63];
 			seed[2] = Z_MASS[(thread >> 9) & 31];
@@ -288,7 +298,7 @@ __global__ void trigg(uint32_t threads, int *g_found, uint8_t *g_seed)
 			seed[5] = 1;
 			seed[6] = Z_INGINF[(thread >> 19) & 31];
 		}
-		if (29622271 < thread <= 46399487) { /* Total Permutations, this frame: 16,777,216 */
+		if ((29622271 < thread) && (thread <= 46399487)) { /* Total Permutations, this frame: 16,777,216 */
 			seed[0] = Z_PREP[(thread & 7)];
 			seed[1] = Z_MASS[(thread >> 3) & 31];
 			seed[2] = 1;
@@ -297,7 +307,7 @@ __global__ void trigg(uint32_t threads, int *g_found, uint8_t *g_seed)
 			seed[5] = 1;
 			seed[6] = Z_INGINF[(thread >> 19) & 31];
 		}
-		if (46399487 < thread <= 63176703) { /* Total Permutations, this frame: 16,777,216 */
+		if ((46399487 < thread) && (thread <= 63176703)) { /* Total Permutations, this frame: 16,777,216 */
 			seed[0] = Z_TIME[(thread & 15)];
 			seed[1] = Z_AMB[(thread >> 4) & 15];
 			seed[2] = 1;
@@ -306,7 +316,7 @@ __global__ void trigg(uint32_t threads, int *g_found, uint8_t *g_seed)
 			seed[5] = 1;
 			seed[6] = Z_ING[(thread >> 19) & 31];
 		}
-		if (63176703 < thread <= 600047615) { /* Total Permutations, this frame: 536,870,912 */
+		if ((63176703 < thread) && (thread <= 600047615)) { /* Total Permutations, this frame: 536,870,912 */
 			seed[0] = Z_TIME[(thread & 15)];
 			seed[1] = Z_AMB[(thread >> 4) & 15];
 			seed[2] = 1;
@@ -366,6 +376,12 @@ __global__ void trigg(uint32_t threads, int *g_found, uint8_t *g_seed)
 		input[14] = 0x80000000;
 		input[15] = 0;
 
+#ifdef CU_DEBUG
+		if (thread == 10) {
+			printf("input: "); for (int i = 0; i < 16; i++) { printf("%08x ", input[i]); } printf("\n");
+		}
+#endif
+
 #pragma unroll
 		for (int i = 0; i < 8; i += 2)
 		{
@@ -373,6 +389,11 @@ __global__ void trigg(uint32_t threads, int *g_found, uint8_t *g_seed)
 		}
 
 		sha256_round(input, state, c_K);
+#ifdef CU_DEBUG
+		if (thread == 10) {
+			printf("state2: "); for (int i = 0; i < 8; i++) { printf("%08x ", state[i]); } printf("\n");
+		}
+#endif
 
 #pragma unroll
 		for (int i = 0; i < 15; i++)
@@ -382,6 +403,13 @@ __global__ void trigg(uint32_t threads, int *g_found, uint8_t *g_seed)
 		input[15] = 0x9c0;
 
 		sha256_round(input, state, c_K);
+
+#ifdef CU_DEBUG
+		if (thread == 10) {
+			printf("state3: "); for (int i = 0; i < 8; i++) { printf("%08x ", state[i]); } printf("\n");
+			printf("seed: "); for (int i = 0; i < 16; i++) { printf("%02x ", seed[i]); } printf("\n");
+		}
+#endif
 
 		if (gpu_trigg_eval(state, c_difficulty))
 		{
@@ -509,6 +537,15 @@ __host__ char *trigg_generate_cuda(byte *mroot, uint32_t *nHaiku)
 			memcpy(ctx[i].midstate, sha256.state, 32);
 			memcpy(ctx[i].input, Tchain + 256, 32);
 		}
+
+#ifdef CU_DEBUG
+		memset(ctx[i].midstate, 0, 32);
+		memset(ctx[i].input, 0, 32);
+		memset(bnum, 0, 8);
+		printf("input: "); for (int j = 0; j < 8; j++) { printf("%08x ", ctx[i].input[j]); } printf("\n");
+		printf("Tchain: ");  for (int j = 0; j < 312; j++) { printf("%02x ", Tchain[j]); } printf("\n");
+		Sleep(1000);
+#endif
 
 		if (cudaStreamQuery(streams[i]) == cudaSuccess) cudaMemcpy(ctx[i].found, ctx[i].d_found, 4, cudaMemcpyDeviceToHost);
 		/** Due to the asynchronous nature of this process,

@@ -1,3 +1,5 @@
 *.tmp
+*.aps
 startnodes.lst
+fullnodes.lst
 maddr.dat
