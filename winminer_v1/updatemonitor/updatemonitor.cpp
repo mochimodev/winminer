@@ -78,10 +78,9 @@ int main(int argc, char **argv)
 			fclose(restartlock);
 			system("copy restart.tmp restart.lck");
 			_unlink("restart.tmp");
-
-			// Prepare for next run.
-			Sleep(100);
-			firstupdate = 1;
+			
+ 			// Prepare for next run.	
+			Sleep(100);	
 		}
 	}
 	if (Needcleanup) WSACleanup();
