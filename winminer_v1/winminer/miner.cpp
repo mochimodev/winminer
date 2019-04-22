@@ -91,6 +91,7 @@ int miner(char *blockin, char *blockout, char *addrfile, Compute_Type ct)
 				loopcount++;
 				printf("\n\nStatus (solving):  HPS: %luM/h Now Solving: 0x%s  Diff: %d  TX Count: %lu Blocks Solved: %d\n",
 					(unsigned long)hps, bnum2hex(bt.bnum), bt.difficulty[0], (unsigned long)get32(bt.tcount), solvedblocks);
+				set_status("solving");
 				haikurate = hps;
 				current_block = *((uint64_t*)bt.bnum);
 				current_diff = bt.difficulty[0];
@@ -100,6 +101,7 @@ int miner(char *blockin, char *blockout, char *addrfile, Compute_Type ct)
 			if (haiku != NULL) break;
 			if (exists("restart.lck")) {
 				printf("\nNetwork Block Update Detected, Downloading new block to mine.");
+				set_status("updating block");
 				trigg_free_gpu(ct);
 				return VERROR;
 			}
@@ -107,6 +109,7 @@ int miner(char *blockin, char *blockout, char *addrfile, Compute_Type ct)
 				printf("\nGUI no longer running, exiting.");
 				Running = 0;
 			}
+			Sleep(1);
 		}
 		trigg_free_gpu(ct);
 		if (!Running) break;

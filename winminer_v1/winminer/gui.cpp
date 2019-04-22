@@ -10,6 +10,8 @@
 
 #include "resource.h"
 
+#include "gui.h"
+
 LRESULT CALLBACK WndProc(HWND, UINT, WPARAM, LPARAM);
 VOID CALLBACK RedrawTimerProc(HWND hWnd, UINT msg, UINT timerId, DWORD dwTime);
 DWORD WINAPI start_gui(LPVOID lpParam);
@@ -22,7 +24,10 @@ DWORD dwGUIThreadId;
 HBITMAP ui_bitmap;
 HDC ui_hDc;
 
+char status_str[64];
+
 Gdiplus::Image* ui_image;
+static const uint32_t width = 568, height = 548;
 
 int start_gui_thread() {
 	hGUIThread = CreateThread(
@@ -59,13 +64,15 @@ int check_gui_thread_alive() {
 DWORD WINAPI start_gui(LPVOID lpParam) {
 	HINSTANCE hInstance = (HINSTANCE)GetModuleHandle(NULL);
 
+	set_status("initializing");
+
 	WNDCLASS wnd = {};
 	wnd.lpfnWndProc = WndProc;
 	wnd.hInstance = hInstance;
 	wnd.lpszClassName = szWindowClass;
 	wnd.hbrBackground = NULL;
+	wnd.hCursor = LoadCursor(NULL, IDC_ARROW);
 	RegisterClass(&wnd);
-
 
 	HWND hWnd = CreateWindowEx(
 		0,
@@ -73,7 +80,7 @@ DWORD WINAPI start_gui(LPVOID lpParam) {
 		szTitle,
 		WS_OVERLAPPEDWINDOW,
 		CW_USEDEFAULT, CW_USEDEFAULT,
-		568, 548,
+		width, height,
 		NULL,
 		NULL,
 		hInstance,
@@ -84,7 +91,7 @@ DWORD WINAPI start_gui(LPVOID lpParam) {
 		return -1;
 	}
 
-	HRGN hRegion = CreateRoundRectRgn(0, 0, 568, 548, 568, 548);
+	HRGN hRegion = CreateRoundRectRgn(0, 0, width, height, width, height);
 	SetWindowRgn(hWnd, hRegion, true);
 
 	DWORD dwStyle = GetWindowLong(hWnd, GWL_STYLE);
@@ -132,13 +139,17 @@ DWORD WINAPI start_gui(LPVOID lpParam) {
 	}
 	ui_image = Gdiplus::Image::FromStream(imgStream);
 	imgStream->Release();
-	Gdiplus::Rect gdi_rect(0, 0, 568, 548);
+	Gdiplus::Rect gdi_rect(0, 0, width, height);
 	HDC hDc = GetDC(hWnd);
 	ui_hDc = CreateCompatibleDC(hDc);
-	ui_bitmap = CreateCompatibleBitmap(hDc, 568, 548);
+	ui_bitmap = CreateCompatibleBitmap(hDc, width, height);
 	SelectObject(ui_hDc, ui_bitmap);
 	Gdiplus::Graphics ui_gfx(ui_hDc);
 	ui_gfx.DrawImage(ui_image, gdi_rect);
+
+	// Draw a translucent black layer on top to make it look more like a watermark
+	Gdiplus::SolidBrush brush(Gdiplus::Color(215, 0, 0, 0));
+	ui_gfx.FillRectangle(&brush, 0, 0, width, height);
 	
 
 	ShowWindow(hWnd, SW_SHOWDEFAULT);
@@ -174,46 +185,33 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
 
 		RECT r = ps.rcPaint;
 		
-		BitBlt(hDc, 0, 0, 568, 548, ui_hDc, 0, 0, SRCCOPY);
+		BitBlt(hDc, 0, 0, width, height, ui_hDc, 0, 0, SRCCOPY);
 
 		SetBkMode(hDc, TRANSPARENT);
-		SetTextColor(hDc, RGB(0, 80, 0));
+		SetTextColor(hDc, RGB(0, 200, 0));
 		HFONT hFont = CreateFont(16, 0, 0, 0, FW_NORMAL, false, false, false, 0, 0, 0, 2, 0, "SYSTEM_FIXED_FONT");
 		HFONT hTmp = (HFONT)SelectObject(hDc, hFont);
 		put_text(hDc, 287, 35, "Mochimo");
 		put_text(hDc, 285, 46, "Winminer v1.5");
 
+		char buf[200];
+
 		// Column 1
-		put_text(hDc, 139, 140, "Haikurate");
-		put_text(hDc, 183, 156, "MH/s");
-		char buf[20];
-		_itoa(haikurate, buf, 10);
-		put_text(hDc, 139, 156, buf);
 
-		put_text(hDc, 139, 182, "Devices");
-		put_text(hDc, 139, 198, "CUDA:");
-		_itoa(num_cuda, buf, 10);
-		put_text(hDc, 198, 198, buf);
-		put_text(hDc, 139, 214, "OpenCL:");
-		_itoa(num_opencl, buf, 10);
-		put_text(hDc, 198, 214, buf);
+		snprintf(buf, 200, "Block: 0x%016x", current_block);
+		put_text(hDc, 139, 100, buf);
 
-		// Column 2
-		put_text(hDc, 244, 140, "Block");
-		snprintf(buf, 20, "0x%08x", current_block);
-		put_text(hDc, 244, 156, buf);
+		snprintf(buf, 200, "Diff: % 6d, TX Count: % 6d, Solved blocks: % 6d", current_diff, tx_count, blocks_solved);
+		put_text(hDc, 139, 116, buf);
 
-		put_text(hDc, 244, 182, "Diff");
-		_itoa(current_diff, buf, 10);
-		put_text(hDc, 244, 198, buf);
+		snprintf(buf, 200, "Status: %s", status_str);
+		put_text(hDc, 139, 132, buf);
+		
+		snprintf(buf, 200, "Devices: CUDA: %d, OpenCL: %d", num_cuda, num_opencl);
+		put_text(hDc, 139, 148, buf);
 
-		put_text(hDc, 244, 224, "TX Count");
-		_itoa(tx_count, buf, 10);
-		put_text(hDc, 244, 240, buf);
-
-		put_text(hDc, 244, 266, "Solved");
-		_itoa(blocks_solved, buf, 10);
-		put_text(hDc, 244, 282, buf);
+		snprintf(buf, 200, "Haikurate: % 10lu MH/s", haikurate);
+		put_text(hDc, 139, 164, buf);
 
 
 		DeleteObject(hFont);
@@ -246,4 +244,9 @@ VOID CALLBACK RedrawTimerProc(HWND hWnd, UINT msg, UINT timerId, DWORD dwTime) {
 	if (res == false) {
 		printf("Redraw window failed!\n");
 	}
+}
+
+
+void set_status(char *str) {
+	strncpy(status_str, str, 64);
 }
