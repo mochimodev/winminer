@@ -40,9 +40,12 @@ int main(int argc, char **argv)
 	int j, status;
 	time_t stime;
 	time_t now = time(NULL);
+	time_t interval = 40;
+	time_t update = now + interval;
 	char *Statusarg;
 	word32 *ip;
 	int firstupdate = 1;
+	int intervalmultiplier = 1;
 	FILE *restartlock;
 
 	static WORD wsaVerReq;
@@ -60,13 +63,20 @@ int main(int argc, char **argv)
 		ip = &Coreplist[j];
 		if (*ip == 0) continue;
 		set_bnum(Cblocknum, ip);
-		if (cmp64(Cblocknum, LastCblocknum) > 0) {
+		now = time(NULL);
+		if (cmp64(Cblocknum, LastCblocknum) > 0 || now >= update) {
 			if (firstupdate != 0) {
 				memcpy(LastCblocknum, Cblocknum, 8);
 				firstupdate = 0;
 				continue;
 			}
-			printf("\nBlock update detected.");
+			if(now >= update) {
+				intervalmultiplier *= 2;
+				printf("\nIntra-Block update.");
+			} else {
+				intervalmultiplier = 1;
+				printf("\nBlock update detected.");
+			}
 			memcpy(LastCblocknum, Cblocknum, 8);
 			if (cmp64(Cblocknum, LastCblocknum) != 0) printf("\nmemcpy failed.");
 			restartlock = fopen("restart.tmp", "w+b");
@@ -78,10 +88,10 @@ int main(int argc, char **argv)
 			fclose(restartlock);
 			system("copy restart.tmp restart.lck");
 			_unlink("restart.tmp");
-
-			// Prepare for next run.
+			
+ 			// Prepare for next run.	
+			update = now + (interval * intervalmultiplier);
 			Sleep(100);
-			firstupdate = 1;
 		}
 	}
 	if (Needcleanup) WSACleanup();

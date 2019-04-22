@@ -244,7 +244,7 @@ int main(int argc, char **argv)
 	srand16(time(&stime));
 	srand2(stime, 0, 0);
 
-	printf("\nMochimo Windows Headless Miner version 1.4.1\n"
+	printf("\nMochimo Windows Headless Miner version 1.4.2\n"
 		"Mochimo Main Net v2.3 Original Release Date: 04/07/2019\n"
 		"Copyright (c) 2019 by Adequate Systems, LLC."
 		" All Rights Reserved.\n\n"
