@@ -121,7 +121,7 @@ int trigg_init_cl(byte difficulty, byte *blockNumber) {
 	const char *srcptr = src;
 	size_t srcsize = dwSize;
 
-	for (int i = 0; i < num_devices; i++) {
+	for (cl_uint i = 0; i < num_devices; i++) {
 		cl_int err;
 		ctx[i].context = clCreateContext(properties, 1, &(device_id[i]), NULL, NULL, &err);
 		if (CL_SUCCESS != err) {
@@ -231,13 +231,50 @@ int trigg_init_cl(byte difficulty, byte *blockNumber) {
 }
 
 void trigg_free_cl() {
-	printf("trigg_free_cl stub!\n");
+	free(diff);
+	free(bnum);
+
+	for (cl_uint i = 0; i < num_devices; i++) {
+		cl_int err = clReleaseMemObject(ctx[i].d_found);
+		if (CL_SUCCESS != err) {
+			printf("clReleaseMemObject failed. Error: %d\n", err);
+		}
+		err = clReleaseMemObject(ctx[i].d_seed);
+		if (CL_SUCCESS != err) {
+			printf("clReleaseMemObject failed. Error: %d\n", err);
+		}
+		err = clReleaseMemObject(ctx[i].d_midstate256);
+		if (CL_SUCCESS != err) {
+			printf("clReleaseMemObject failed. Error: %d\n", err);
+		}
+		err = clReleaseMemObject(ctx[i].d_input32);
+		if (CL_SUCCESS != err) {
+			printf("clReleaseMemObject failed. Error: %d\n", err);
+		}
+		err = clReleaseMemObject(ctx[i].d_blockNumber8);
+		if (CL_SUCCESS != err) {
+			printf("clReleaseMemObject failed. Error: %d\n", err);
+		}
+
+		err = clReleaseCommandQueue(ctx[i].cq);
+		if (CL_SUCCESS != err) {
+			printf("clReleaseCommandQueue failed. Error: %d\n", err);
+		}
+		err = clReleaseKernel(ctx[i].k_trigg);
+		if (CL_SUCCESS != err) {
+			printf("clReleaseKernel failed. Error: %d\n", err);
+		}
+		err = clReleaseContext(ctx[i].context);
+		if (CL_SUCCESS != err) {
+			printf("clReleaseContext failed. Error: %d\n", err);
+		}
+	}
 }
 
 
 char *trigg_generate_cl(byte *mroot, uint32_t *nHaiku) {
 	cl_int err;
-	int i;
+	cl_uint i;
 
 	for (i = 0; i < num_devices; i++) {
 #ifdef CL_DEBUG
