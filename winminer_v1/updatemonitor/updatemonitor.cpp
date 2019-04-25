@@ -53,12 +53,15 @@ int main(int argc, char **argv)
 	Needcleanup = 1;
 	read_coreipl(Corefname);
     for (j = 0 ; ; j++) {
-		Sleep(1);
 		if (j >= CORELISTLEN) {
 			j = 0;
 		}
 		ip = &Coreplist[j];
-		if (*ip == 0) continue;
+		if (*ip == 0) {
+			/* No more IPs in core list, wait 100ms before next check*/
+			Sleep(100);
+			continue;
+		}
 		set_bnum(Cblocknum, ip);
 		now = time(NULL);
 		if (cmp64(Cblocknum, LastCblocknum) > 0 || now >= update) {
