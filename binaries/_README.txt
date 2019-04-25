@@ -1,7 +1,8 @@
 The MD5HASH for these executables are:
 
-mochimo-winminer.exe     57334C8788E9940F306BCF8CD285206D
-update-monitor.exe       4F18E7CDF633341EF7C55952014D514B
+mochimo-winminer.exe     7df78834ad58098e256b8c2c6e895abe
+update-monitor.exe       66a9da9ba71f19f5ae36a758fc0e0eb2
+
 
 This software is offered with no warranty, and is subject to the terms and conditions of the license, which can be found here:
 https://github.com/mochimodev/mochimo/blob/master/LICENSE.PDF
@@ -25,3 +26,6 @@ Usage: mochimo-winminer [-option -option2 . . .]
 		           -cFILENAME.LST read core ip list from file (default: fullnodes.lst)
 		           -tN set Trace to N
 		           -h  this message
+		           -f  disable GUI
+		           -U  force CUDA mode
+		           -O  force OpenCL mode
