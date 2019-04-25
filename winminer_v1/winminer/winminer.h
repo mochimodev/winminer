@@ -49,6 +49,7 @@ extern byte Cbits;
 extern int solvedblocks;
 extern byte Running;
 extern byte Trace;
+extern bool enable_gui;
 
 typedef int pid_t;
 

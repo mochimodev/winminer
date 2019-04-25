@@ -55,6 +55,7 @@ byte Cbits;
 int solvedblocks = 0;
 byte Running = 1;
 byte Trace;
+bool enable_gui = true;
 
 void usage(void)
 {
@@ -70,6 +71,9 @@ void usage(void)
 		"           -cFILENAME.LST read core ip list from file (default: fullnodes.lst)\n"
 		"           -tN set Trace to N\n"
 		"           -h  this message\n"
+		"           -f  disable GUI\n"
+		"           -U  force CUDA mode\n"
+		"           -O  force OpenCL mode\n"
 	);
 	exit(1);
 }
@@ -218,7 +222,8 @@ int main(int argc, char **argv)
 	FILE *restartlock;
 	time_t now = time(NULL);
 	char *Statusarg;
-	bool gui = true;
+	bool force_cuda = false;
+	bool force_opencl = false;
 
 #ifdef _WINSOCKAPI_
 	static WORD wsaVerReq;
@@ -246,23 +251,29 @@ int main(int argc, char **argv)
 		case 't':  Trace = atoi(&argv[j][2]);
 			break;
 		case 'f':
-			gui = false;
+			enable_gui = false;
 			break;
 		case 'x':  if (strlen(argv[j]) != 8) break;
 			Statusarg = argv[j];
+			break;
+		case 'U':
+			force_cuda = true;
+			break;
+		case 'O':
+			force_opencl = true;
 			break;
 		default:   usage();
 		}
 	}
 
-	if (gui) {
+	if (enable_gui) {
 		start_gui_thread();
 	}
 
 	srand16(time(&stime));
 	srand2(stime, 0, 0);
 
-	printf("\nMochimo Windows Headless Miner version 1.4.1\n"
+	printf("\nMochimo Windows Headless Miner version 1.5\n"
 		"Mochimo Main Net v2.3 Original Release Date: 04/07/2019\n"
 		"Copyright (c) 2019 by Adequate Systems, LLC."
 		" All Rights Reserved.\n\n"
@@ -308,12 +319,21 @@ restart:
 		mkwots();
 	}
 
-	Compute_Type ct = autoselect_compute_type();
+	Compute_Type ct;
+	if (force_cuda) {
+		ct = CT_CUDA;
+	}
+	else if (force_opencl) {
+		ct = CT_OPENCL;
+	}
+	else {
+		ct = autoselect_compute_type();
+	}
 
 	for (; Running == 1;) {
 		if ((time(NULL) - now) > 3600) goto restart;
 		for (; Running == 1;) {
-			if (gui) {
+			if (enable_gui) {
 				check_gui_thread_alive();
 			}
 

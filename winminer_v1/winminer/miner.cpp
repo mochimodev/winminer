@@ -105,7 +105,7 @@ int miner(char *blockin, char *blockout, char *addrfile, Compute_Type ct)
 				trigg_free_gpu(ct);
 				return VERROR;
 			}
-			if (check_gui_thread_alive() != 1) {
+			if (enable_gui && check_gui_thread_alive() != 1) {
 				printf("\nGUI no longer running, exiting.");
 				Running = 0;
 			}
