@@ -157,26 +157,78 @@ int read_coreipl(char *fname)
 	return j;
 }
 
-int patch_addr(char *cblock, char *addrfile)
+int patch_addr(char *cblock, char *addrfile, BTRAILER *miner_bt)
 {
 	FILE *fp, *fpout;
-	byte buff[TXADDRLEN];
+	byte addr_buff[TXADDRLEN];
 	int ecode = 0;
+	SHA256_CTX mctx;
+	TXQENTRY tx;
 
+	/* Read mining reward address */
 	fp = fopen(addrfile, "rb");
 	if (fp == NULL) {
 		printf("\nTrace: Could not open addrfile.");
 	}
+	if (fread(addr_buff, 1, TXADDRLEN, fp) != TXADDRLEN) ecode++;
+	fclose(fp);
+
+	/* Open candidate block */
 	fpout = fopen(cblock, "r+b");
 	if (fpout == NULL) {
-		fclose(fp);
 		printf("\nTrace: Unable to write updated candidate block.");
 		return VERROR;
 	}
-	if (fread(buff, 1, TXADDRLEN, fp) != TXADDRLEN) ecode++;
-	if (fseek(fpout, 4, SEEK_SET)) ecode++;
-	if (fwrite(buff, 1, TXADDRLEN, fpout) != TXADDRLEN) ecode++;
+	word32 hdrlen, tcount;
+	if (fread(&hdrlen, 1, 4, fpout) != 4) ecode++; /* read header length */
+	if (hdrlen != sizeof(BHEADER)) ecode++; /* bad header length */
+
+	/* get block file length */
+	if (fseek(fpout, 0, SEEK_END)) ecode++;
+	unsigned long blocklen = ftell(fpout);
+
+	/* Read BTRAILER from cblock */
+	BTRAILER bt;
+	if (fseek(fpout, -(sizeof(BTRAILER)), SEEK_END)) ecode++;
+	if (fread(&bt, 1, sizeof(BTRAILER), fpout) != sizeof(BTRAILER)) ecode++;
+	
+	/* Read block header */
+	BHEADER bh;
+	if (fseek(fpout, 0, SEEK_SET)) ecode++;
+	if (fread(&bh, 1, hdrlen, fpout) != hdrlen) ecode++;
+
+	/* replace mining address */
+	memcpy(bh.maddr, addr_buff, TXADDRLEN);
+
+	sha256_init(&mctx); /* begin block-hash */
+	sha256_update(&mctx, (byte*)&bh, hdrlen); /* with header */
+
+	tcount = get32(bt.tcount);
+	TXQENTRY *Q2 = (TXQENTRY*)malloc(sizeof(TXQENTRY) * tcount);
+
+	/* Add TXs to hash */
+	for (word32 Tnum = 0; Tnum < tcount; Tnum++) {
+		if (fread(&tx, 1, sizeof(TXQENTRY), fpout) != sizeof(TXQENTRY)) {
+			printf("bad TX read\n");
+			ecode++;
+			return ecode;
+		}
+		sha256_update(&mctx, (byte*)&tx, sizeof(TXQENTRY));
+	}
+
+	sha256_update(&mctx, (byte*)&bt, (HASHLEN + 8 + 8 + 4 + 4 + 4));
+
+	sha256_final(&mctx, bt.mroot);
+
+	/* update miner bt */
+	memcpy(miner_bt, &bt, sizeof(BTRAILER));
+
+	/* Write changes to cblock */
+	if (fseek(fpout, 4, SEEK_SET)) ecode++; /* seek to maddr start */
+	if (fwrite(addr_buff, 1, TXADDRLEN, fpout) != TXADDRLEN) ecode++;
+	if (fseek(fpout, -(sizeof(BTRAILER)), SEEK_END)) ecode++; /* seek to start of BTRAILER */
+	if (fwrite(&bt, 1, sizeof(BTRAILER), fpout) != sizeof(BTRAILER)) ecode++; /* write new BTRAILER */
+	free(Q2);
 	fclose(fpout);
-	fclose(fp);
 	return ecode;
 }

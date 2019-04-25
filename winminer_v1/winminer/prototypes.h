@@ -30,7 +30,7 @@ int exists(char *fname);
 char *bnum2hex(byte *bnum);
 int readtrailer(BTRAILER *trailer, char *fname);
 int read_coreipl(char *fname);
-int patch_addr(char *cblock, char *addrfile);
+int patch_addr(char *cblock, char *addrfile, BTRAILER* bt);
 
 /* Random Generator Function Prototypes */
 word32 srand16(word32 x);
@@ -79,3 +79,6 @@ int mkwots();
 
 /* Miner Prototype */
 int miner(char *blockin, char *blockout, char *addrfile, Compute_Type ct);
+
+
+char *trigg_check(byte *in, byte d, byte *bnum);

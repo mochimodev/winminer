@@ -10,6 +10,11 @@
 
 #include "winminer.h"
 
+
+int Tdiff;
+byte Tchain[32 + 256 + 16 + 8];
+
+
 void trigg_solve(byte *link, int diff, byte *bnum)
 {
 	Tdiff = diff;

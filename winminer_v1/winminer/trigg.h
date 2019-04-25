@@ -348,8 +348,8 @@ static DICT Dict[MAXDICT] = {
 
 };
 
-static int Tdiff;
-static byte Tchain[32 + 256 + 16 + 8];
+extern int Tdiff;
+extern byte Tchain[32 + 256 + 16 + 8];
 
 static FE Frame[][MAXH] = {
 

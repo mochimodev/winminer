@@ -61,7 +61,7 @@ int miner(char *blockin, char *blockout, char *addrfile, Compute_Type ct)
 			printf("\nminer: cannot rename %s", blockin);
 			break;
 		}
-		patch_addr("m3.tmp", addrfile);
+		patch_addr("m3.tmp", addrfile, &bt);
 		printf("\nTrace: Patched in your mining address successfully.");
 
 		printf("\nminer: beginning solve: %s block: 0x%s", blockin,
@@ -113,6 +113,10 @@ int miner(char *blockin, char *blockout, char *addrfile, Compute_Type ct)
 		}
 		trigg_free_gpu(ct);
 		if (!Running) break;
+
+		if (!trigg_check(bt.mroot, bt.difficulty[0], bt.bnum)) {
+			printf("ERROR - Block is not valid!\n");
+		}
 
 		Sleep(2);
 		put32(bt.stime, time(NULL));

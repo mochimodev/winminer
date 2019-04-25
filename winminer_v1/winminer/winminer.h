@@ -224,6 +224,24 @@ typedef struct {
 	pid_t pid;     /* process id of child -- zero if empty slot */
 } NODE;
 
+/* Structure for clean TX queue */
+typedef struct {
+	byte src_addr[TXADDRLEN];
+	byte dst_addr[TXADDRLEN];
+	byte chg_addr[TXADDRLEN];
+	byte send_total[TXAMOUNT];
+	byte change_total[TXAMOUNT];
+	byte tx_fee[TXAMOUNT];
+	byte tx_sig[TXSIGLEN];
+	byte tx_id[HASHLEN];
+} TXQENTRY;
+
+/* The block header */
+typedef struct {
+	byte hdrlen[4];
+	byte maddr[TXADDRLEN];
+	byte mreward[8];
+} BHEADER;
 
 /* The block trailer at end of block file */
 typedef struct {
