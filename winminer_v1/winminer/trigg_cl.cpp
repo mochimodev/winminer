@@ -94,9 +94,8 @@ static TriggCLCTX ctx[64] = {};
 static char *nullcp = '\0';
 static byte *diff;
 static byte *bnum;
-static int thrds = 128;
-static int threads = 134217728;
-static size_t grid = 134217728;
+static int thrds = 512;
+static size_t threads = thrds * 1024 * 1024;
 static size_t block = 256;
 
 int trigg_init_cl(byte difficulty, byte *blockNumber) {
@@ -310,7 +309,7 @@ char *trigg_generate_cl(byte *mroot, uint32_t *nHaiku) {
 				printf("%s:%d: clSetKernelArg failed. Error: %d\n", __FILE__, __LINE__, err);
 			}
 
-			err = clEnqueueNDRangeKernel(ctx[i].cq, ctx[i].k_trigg, 1, NULL, &grid, &block, 0, NULL, &ctx[i].trigg_event);
+			err = clEnqueueNDRangeKernel(ctx[i].cq, ctx[i].k_trigg, 1, NULL, &threads, &block, 0, NULL, &ctx[i].trigg_event);
 			if (CL_SUCCESS != err) {
 				printf("%s:%d: clEnqueueNDRangeKernel failed. Error: %d\n", __FILE__, __LINE__, err);
 			}
