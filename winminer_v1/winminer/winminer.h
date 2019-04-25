@@ -32,6 +32,7 @@
 #include "gpu_wrapper.h"
 #include "trigg.h"
 
+#define WINMINER_VERSION "1.5"
 
 /* Global External Variables List */
 

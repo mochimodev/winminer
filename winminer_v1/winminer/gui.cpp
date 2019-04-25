@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <tchar.h>
 
+#include "winminer.h"
 #include "miner.h"
 
 #include "resource.h"
@@ -192,7 +193,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
 		HFONT hFont = CreateFont(16, 0, 0, 0, FW_NORMAL, false, false, false, 0, 0, 0, 2, 0, "SYSTEM_FIXED_FONT");
 		HFONT hTmp = (HFONT)SelectObject(hDc, hFont);
 		put_text(hDc, 287, 35, "Mochimo");
-		put_text(hDc, 285, 46, "Winminer v1.5");
+		put_text(hDc, 285, 46, "Winminer v" WINMINER_VERSION);
 
 		char buf[200];
 
