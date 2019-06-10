@@ -18,6 +18,9 @@ Please read the license file in the package for additional restrictions.
 
 Contact: support@mochimo.org
 
+## Binary releases
+Binary releases can be found using this link: https://github.com/mochimodev/winminer/releases
+
 ## Compilation Instructions
 *Disclaimer: When downloading/installing the Cuda Toolkit, ensure:*
 ```
@@ -31,14 +34,8 @@ Contact: support@mochimo.org
 1. Download and install Visual Studio 2017 and a Cuda Toolkit IN THAT ORDER.
 2. Open a Visual Studio Developer Command Prompt compatible with your system (x86/x64)
 3. Clone the repository with command: `git clone https://github.com/mochimodev/winminer.git`
-~~4. Navigate to your `winminer\winminer_v1\winminer` folder~~
-~~5. Compile `mochimo-winminer.exe` with command: `nvcc -arch=sm_37 -o mochimo-winminer.exe winminer.cpp trigg.cu`~~
-~~6. Move `mochimo-winminer.exe` binary to the `\winminer\binaries` folder~~
-~~7. Navigate to your `winminer\winminer_v1\updatemonitor` folder~~
-~~8. Compile `update-monitor.exe` with command: `cl /Feupdate-monitor.exe updatemonitor.cpp`~~
-~~9. Move `update-monitor.exe` binary to the `\winminer\binaries` folder~~
 4. Navigate to your `winminer\winminer_v1` folder
 5. Compile with command: `msbuild mochimo-winminer.sln`
 6. You can now find your miner in the `winminer\winminer_v1\x64\Release` folder
-10. Run the miner with your fingers crossed.
+7. Run the miner with your fingers crossed.
 
