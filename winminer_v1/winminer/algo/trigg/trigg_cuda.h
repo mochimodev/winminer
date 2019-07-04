@@ -10,10 +10,10 @@
 
 #pragma once
 
-#include "helper_cuda.h"
+#include "../../helper_cuda.h"
 #include <cuda_runtime.h>
 
-#include "types.h"
+#include "../../types.h"
 
 /* GPU Prototypes */
 __host__ int trigg_init_cuda(byte difficulty, byte *blockNumber);

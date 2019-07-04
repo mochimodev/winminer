@@ -12,11 +12,11 @@
 #include <Windows.h>
 #include <tchar.h>
 
-#include "winminer.h"
+#include "../../winminer.h"
 
 #include "CL/cl.h"
 
-#include "resource.h"
+#include "../../resource.h"
 
 cl_uint num_devices = 0;
 cl_platform_id platform_id = NULL;

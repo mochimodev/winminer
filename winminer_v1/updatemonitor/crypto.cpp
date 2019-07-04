@@ -190,7 +190,8 @@ void hashblock(char *fname, SHA256_CTX *bctx, int offset)
 	FILE *fp;
 	byte buff[16384];
 	long len;
-	int n, count;
+	int n;
+	uint32_t count;
 
 	fp = fopen(fname, "rb");
 	if (fp == NULL) return;
@@ -201,7 +202,7 @@ void hashblock(char *fname, SHA256_CTX *bctx, int offset)
 	sha256_init(bctx);
 	for (n = 16384; len; len -= count) {
 		if (len < 16384) n = len;
-		count = fread(buff, 1, n, fp);
+		count = (uint32_t)fread(buff, 1, n, fp);
 		if (count < 1) break;
 		sha256_update(bctx, buff, count);
 	}

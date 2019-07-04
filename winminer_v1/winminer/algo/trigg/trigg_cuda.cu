@@ -8,7 +8,7 @@
  *
 */
 
-#include "winminer.h"
+#include "../../winminer.h"
 #include "trigg_cuda.h"
 
 /* Lines 19 through 208 of this file were provided by a third party and are not subject to copyright

@@ -11,6 +11,11 @@
 #include "winminer.h"
 #include "miner.h"
 #include "gui.h"
+#include "algo/peach/cuda_peach.h"
+#include "algo/peach/peach.h"
+extern "C" {
+#include "crypto/hash/cpu/keccak.h"
+}
 
 uint64_t haikurate = 0;
 uint64_t current_block = 0;
@@ -27,10 +32,11 @@ int miner(char *blockin, char *blockout, char *addrfile, Compute_Type ct)
 	FILE *fp;
 	SHA256_CTX bctx;
 	char *haiku;
+	byte v24haiku[256] = "";
 	time_t htime;
 	int etime;
 	byte cbnum[8];
-	uint32_t hcount, hps;
+	uint64_t hcount, hps;
 	int initGPU = 0;
 	int loopcount = 0;
 
@@ -67,10 +73,11 @@ int miner(char *blockin, char *blockout, char *addrfile, Compute_Type ct)
 		printf("\nminer: beginning solve: %s block: 0x%s", blockin,
 			bnum2hex(bt.bnum));
 
-		trigg_solve(bt.mroot, bt.difficulty[0], bt.bnum);
-		printf("\nTrace: Solution state space created.");
-
-		initGPU = trigg_init_gpu(bt.difficulty[0], bt.bnum, ct);
+		// v2.4 and later
+		if ((initGPU = init_cuda_peach(bt.difficulty[0], bt.phash, bt.bnum)) < 1) {
+			printf("Failed to initialize GPU devices\n");
+			break;
+		}
 
 		if (initGPU < 1 || initGPU > 64) {
 			printf("\nTrace: unsupported number of GPUs detected -> %d", initGPU);
@@ -78,11 +85,33 @@ int miner(char *blockin, char *blockout, char *addrfile, Compute_Type ct)
 		}
 
 		printf("\nDetected %d compatible GPUs", initGPU);
-		byte testtest[8];
 		for (htime = time(NULL), hcount = 0; ; ) {
 			if (!Running) break;
-			haiku = trigg_generate_gpu(bt.mroot, &hcount, ct);
+			cuda_peach((byte*)&bt, (uint32_t*)&hps, &Running);
 			
+			// Block validation check
+			if (peach(&bt, get32(bt.difficulty), NULL, 1)) {
+				byte *bt_bytes = (byte*)&bt;
+				char hex[124 * 4];
+				for (int i = 0; i < 124; i++) {
+					sprintf(hex + i * 4, "%03i", bt_bytes[i]);
+				}
+
+				printf("!!!!CUDA Peach solved block is not valid!!!!!\n");
+				printf("CPU BT -> %s\n", hex);
+				Sleep(5000);
+				free_cuda_peach();
+				break;
+			}
+
+			// Print Haiku
+			char phaiku[256];
+			trigg_expand2(bt.nonce, (byte*)phaiku);
+			printf("\n%s\n\n", phaiku);
+			//haiku = trigg_generate_gpu(bt.mroot, (uint32_t*)&hcount, ct);
+			
+			printf("\n\n\n\nBLOCK SOLVED!!!!!\n\n\n\n");
+
 			etime = (time(NULL) - htime);
 			if (etime >= 10) {
 				hps = hcount / etime;
@@ -102,7 +131,8 @@ int miner(char *blockin, char *blockout, char *addrfile, Compute_Type ct)
 			if (exists("restart.lck")) {
 				printf("\nNetwork Block Update Detected, Downloading new block to mine.");
 				set_status("updating block");
-				trigg_free_gpu(ct);
+				//trigg_free_gpu(ct);
+				free_cuda_peach();
 				return VERROR;
 			}
 			if (enable_gui && check_gui_thread_alive() != 1) {
@@ -110,13 +140,16 @@ int miner(char *blockin, char *blockout, char *addrfile, Compute_Type ct)
 				Running = 0;
 			}
 			Sleep(1);
+
+			break; // TODO: FIX THIS
 		}
-		trigg_free_gpu(ct);
+		//trigg_free_gpu(ct);
+		free_cuda_peach();
 		if (!Running) break;
 
-		if (!trigg_check(bt.mroot, bt.difficulty[0], bt.bnum)) {
+		/*if (!trigg_check(bt.mroot, bt.difficulty[0], bt.bnum)) {
 			printf("ERROR - Block is not valid!\n");
-		}
+		}*/
 
 		Sleep(2);
 		put32(bt.stime, time(NULL));
@@ -150,7 +183,7 @@ int miner(char *blockin, char *blockout, char *addrfile, Compute_Type ct)
 		printf("\nminer: Solved block 0x%s is now: %s",
 			bnum2hex(bt.bnum), blockout);
 
-		printf("\n\n%s\n\n", haiku);
+		//printf("\n\n%s\n\n", haiku);
 		return VEOK;
 	}
 	printf("Miner exiting...\n");

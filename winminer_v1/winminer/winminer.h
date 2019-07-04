@@ -30,9 +30,12 @@
 
 #include "types.h"
 #include "gpu_wrapper.h"
-#include "trigg.h"
+#include "algo/trigg/trigg.h"
+#include "config.h"
 
-#define WINMINER_VERSION "1.5"
+#define WINMINER_VERSION "1.6b1"
+
+static const word32 v24trigger[2] = { V24TRIGGER, 0 };
 
 /* Global External Variables List */
 
@@ -54,36 +57,20 @@ extern bool enable_gui;
 
 typedef int pid_t;
 
-#define PVERSION   3
 
-#define VEOK        0      /* No error                    */
-#define VERROR      1      /* General error               */
-#define VEBAD       2      /* client was bad              */
 
-/* Protocol Definitions */
+/* stripped-down NODE for rx2() and callserver(): */
+typedef struct {
+	TX tx;  /* transaction buffer */
+	word16 id1;      /* from tx */
+	word16 id2;      /* from tx */
+	int opcode;      /* from tx */
+	word32 src_ip;
+	SOCKET sd;
+	pid_t pid;     /* process id of child -- zero if empty slot */
+} NODE;
 
-#define OP_HELLO          1
-#define OP_HELLO_ACK      2
-#define OP_GETIPL         6
-#define OP_SEND_BL        7
-#define OP_RESOLVE        14
-#define OP_GET_CBLOCK     15
-#define OP_MBLOCK         16
 
-#define TXNETWORK 0x0539
-#define TXEOT     0xabcd
-#define TXADDRLEN 2208
-#define TXAMOUNT  8
-#define TXSIGLEN  2144  /* WOTS */
-#define HASHLEN 32
-#define TXAMOUNT 8
-#define TXBUFF(tx)   ((byte *) tx)
-#define TXBUFFLEN    ((2*5) + (8*2) + 32 + 32 + 32 + 2 + (TXADDRLEN*3) + (TXAMOUNT*3) + TXSIGLEN + (2+2))
-#define TRANBUFF(tx) ((tx)->src_addr)
-#define TRANLEN      ( (TXADDRLEN*3) + (TXAMOUNT*3) + TXSIGLEN )
-#define CRC_BUFF(tx) TXBUFF(tx)
-#define CRC_COUNT   (TXBUFFLEN - (2+2))  /* tx buff less crc and trailer */
-#define CRC_VAL_PTR(tx)  ((tx)->crc16)
 
 #define CORELISTLEN  32
 extern word32 Coreplist[CORELISTLEN];
@@ -184,80 +171,8 @@ static word16 Crc16table[] = {
 void trigg_solve(byte *link, int diff, byte *bnum);
 byte *trigg_gen(byte *in);
 char *trigg_expand(byte *in, int diff);
+void trigg_expand2(byte *in, byte *out);
 
-
-
-/* Communications Protocol Definitions*/
-
-typedef struct {
-	byte version[2];  /* 0x01, 0x00 PVERSION  */
-	byte network[2];  /* 0x39, 0x05 TXNETWORK */
-	byte id1[2];
-	byte id2[2];
-	byte opcode[2];
-	byte cblock[8];        /* current block num  64-bit */
-	byte blocknum[8];      /* block num for I/O in progress */
-	byte cblockhash[32];   /* sha-256 hash of our current block */
-	byte pblockhash[32];   /* sha-256 hash of our previous block */
-	byte weight[32];       /* sum of block difficulties */
-	byte len[2];  /* length of data in transaction buffer for I/O op's */
-	/* start transaction buffer */
-	byte src_addr[TXADDRLEN];
-	byte dst_addr[TXADDRLEN];
-	byte chg_addr[TXADDRLEN];
-	byte send_total[TXAMOUNT];
-	byte change_total[TXAMOUNT];
-	byte tx_fee[TXAMOUNT];
-	byte tx_sig[TXSIGLEN];
-	/* end transaction buffer */
-	byte crc16[2];
-	byte trailer[2];  /* 0xcd, 0xab */
-} TX;
-
-
-/* stripped-down NODE for rx2() and callserver(): */
-typedef struct {
-	TX tx;  /* transaction buffer */
-	word16 id1;      /* from tx */
-	word16 id2;      /* from tx */
-	int opcode;      /* from tx */
-	word32 src_ip;
-	SOCKET sd;
-	pid_t pid;     /* process id of child -- zero if empty slot */
-} NODE;
-
-/* Structure for clean TX queue */
-typedef struct {
-	byte src_addr[TXADDRLEN];
-	byte dst_addr[TXADDRLEN];
-	byte chg_addr[TXADDRLEN];
-	byte send_total[TXAMOUNT];
-	byte change_total[TXAMOUNT];
-	byte tx_fee[TXAMOUNT];
-	byte tx_sig[TXSIGLEN];
-	byte tx_id[HASHLEN];
-} TXQENTRY;
-
-/* The block header */
-typedef struct {
-	byte hdrlen[4];
-	byte maddr[TXADDRLEN];
-	byte mreward[8];
-} BHEADER;
-
-/* The block trailer at end of block file */
-typedef struct {
-	byte phash[HASHLEN];    /* previous block hash (32) */
-	byte bnum[8];           /* this block number */
-	byte mfee[8];           /* transaction fee */
-	byte tcount[4];         /* transaction count */
-	byte time0[4];          /* to compute next difficulty */
-	byte difficulty[4];
-	byte mroot[HASHLEN];  /* hash of all TXQENTRY's */
-	byte nonce[HASHLEN];
-	byte stime[4];        /* unsigned start time GMT seconds */
-	byte bhash[HASHLEN];  /* hash of all block less bhash[] */
-} BTRAILER;
 
 #define WOTS_H
 

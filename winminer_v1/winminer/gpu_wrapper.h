@@ -11,8 +11,8 @@
 #pragma once
 
 #include "types.h"
-#include "trigg_cuda.h"
-#include "trigg_cl.h"
+#include "algo/trigg/trigg_cuda.h"
+#include "algo/trigg/trigg_cl.h"
 
 enum Compute_Type { CT_CUDA, CT_OPENCL };
 

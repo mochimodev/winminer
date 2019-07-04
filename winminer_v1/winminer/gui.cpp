@@ -199,10 +199,10 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
 
 		// Column 1
 
-		snprintf(buf, 200, "Block: 0x%016x", current_block);
+		snprintf(buf, 200, "Block: 0x%016llx", current_block);
 		put_text(hDc, 139, 100, buf);
 
-		snprintf(buf, 200, "Diff: % 6d, TX Count: % 6d, Solved blocks: % 6d", current_diff, tx_count, blocks_solved);
+		snprintf(buf, 200, "Diff: % 6d, TX Count: % 6lld, Solved blocks: % 6d", current_diff, tx_count, blocks_solved);
 		put_text(hDc, 139, 116, buf);
 
 		snprintf(buf, 200, "Status: %s", status_str);
@@ -211,7 +211,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
 		snprintf(buf, 200, "Devices: CUDA: %d, OpenCL: %d", num_cuda, num_opencl);
 		put_text(hDc, 139, 148, buf);
 
-		snprintf(buf, 200, "Haikurate: % 10lu MH/s", haikurate);
+		snprintf(buf, 200, "Haikurate: % 10llu MH/s", haikurate);
 		put_text(hDc, 139, 164, buf);
 
 

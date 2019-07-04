@@ -14,7 +14,7 @@
     <ProjectGuid>{769FA989-A7A9-4D02-B6D3-8628209450B8}</ProjectGuid>
     <RootNamespace>CUDA_MINER</RootNamespace>
     <WindowsTargetPlatformVersion>10.0.17763.0</WindowsTargetPlatformVersion>
-    <CudaToolkitCustomDir>..\..\..\..\..\..\..\..\..\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v10.0</CudaToolkitCustomDir>
+    <CudaToolkitCustomDir>..\..\..\..\..\..\..\..\..\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v10.1</CudaToolkitCustomDir>
     <ProjectName>mochimo-winminer</ProjectName>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
@@ -33,7 +33,7 @@
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ImportGroup Label="ExtensionSettings">
-    <Import Project="$(VCTargetsPath)\BuildCustomizations\CUDA 10.0.props" />
+    <Import Project="$(VCTargetsPath)\BuildCustomizations\CUDA 10.1.props" />
   </ImportGroup>
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
@@ -79,12 +79,70 @@
     <CudaCompile>
       <TargetMachinePlatform>64</TargetMachinePlatform>
       <Optimization>InheritFromHost</Optimization>
+      <CodeGeneration>compute_61,sm_61;compute_75,sm_75</CodeGeneration>
     </CudaCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <CudaCompile Include="trigg_cuda.cu" />
+    <CudaCompile Include="algo\peach\cuda_peach.cu" />
+    <CudaCompile Include="algo\peach\nighthash.cu">
+      <FileType>Document</FileType>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+    </CudaCompile>
+    <CudaCompile Include="algo\v24\cuda-v24.cu">
+      <CodeGeneration Condition="'$(Configuration)|$(Platform)'=='Release|x64'">compute_61,sm_61;compute_70,sm_70</CodeGeneration>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+    </CudaCompile>
+    <CudaCompile Include="algo\trigg\trigg_cuda.cu" />
+    <ClInclude Include="algo\peach\cuda_peach.h" />
+    <ClInclude Include="crypto\hash\cuda\blake2b.cu">
+      <FileType>Document</FileType>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+    </ClInclude>
+    <CudaCompile Include="crypto\hash\cuda\keccak.cu">
+      <FileType>Document</FileType>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+    </CudaCompile>
+    <ClInclude Include="crypto\hash\cuda\md2.cu">
+      <FileType>Document</FileType>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+    </ClInclude>
+    <ClInclude Include="crypto\hash\cuda\md5.cu">
+      <FileType>Document</FileType>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+    </ClInclude>
+    <ClInclude Include="crypto\hash\cuda\sha1.cu">
+      <FileType>Document</FileType>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+    </ClInclude>
+    <ClInclude Include="crypto\hash\cuda\sha256.cu">
+      <FileType>Document</FileType>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="algo\peach\nighthash.h" />
+    <ClInclude Include="algo\peach\peach.h" />
+    <ClInclude Include="algo\peach\sha256.cuh" />
+    <ClInclude Include="algo\v24\cuda-v24.h" />
+    <ClInclude Include="algo\v24\sha256.cuh" />
+    <ClInclude Include="algo\v24\v24.h" />
+    <ClInclude Include="config.h" />
+    <ClInclude Include="crypto\hash\config.h" />
+    <ClInclude Include="crypto\hash\cpu\blake2b.h" />
+    <ClInclude Include="crypto\hash\cpu\keccak.h" />
+    <ClInclude Include="crypto\hash\cpu\md2.h" />
+    <ClInclude Include="crypto\hash\cpu\md5.h" />
+    <ClInclude Include="crypto\hash\cpu\sha1.h" />
+    <ClInclude Include="crypto\hash\cpu\sha256.h" />
+    <ClInclude Include="crypto\hash\cuda\blake2b.cuh" />
+    <ClInclude Include="crypto\hash\cuda\config.h" />
+    <ClInclude Include="crypto\hash\cuda\keccak.cuh" />
+    <ClInclude Include="crypto\hash\cuda\md2.cuh" />
+    <ClInclude Include="crypto\hash\cuda\md5.cuh" />
+    <ClInclude Include="crypto\hash\cuda\sha1.cuh" />
+    <ClInclude Include="crypto\hash\cuda\sha256.cuh" />
+    <ClInclude Include="crypto\hash\mcmhash.h" />
+    <ClInclude Include="crypto\wots\wots.h" />
     <ClInclude Include="gui.h" />
     <ClInclude Include="gpu_wrapper.h" />
     <ClInclude Include="helper_cuda.h" />
@@ -92,27 +150,76 @@
     <ClInclude Include="miner.h" />
     <ClInclude Include="prototypes.h" />
     <ClInclude Include="resource.h" />
-    <ClInclude Include="trigg_cl.h" />
-    <ClInclude Include="trigg_cuda.h" />
-    <ClInclude Include="trigg.h" />
+    <ClInclude Include="algo\trigg\trigg_cl.h" />
+    <ClInclude Include="algo\trigg\trigg_cuda.h" />
+    <ClInclude Include="algo\trigg\trigg.h" />
+    <ClInclude Include="sleep.h" />
     <ClInclude Include="types.h" />
     <ClInclude Include="winminer.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="algo\peach\nighthash.c">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="algo\peach\peach.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="algo\v24\v24.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+    </ClCompile>
     <ClCompile Include="comms.cpp" />
+    <ClCompile Include="crypto\crc16.c">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="crypto\crc32.c">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="crypto\hash\cpu\blake2b.c">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="crypto\hash\cpu\keccak.c">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="crypto\hash\cpu\md2.c">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="crypto\hash\cpu\md5.c">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="crypto\hash\cpu\sha1.c">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="crypto\hash\cpu\sha256.c">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="crypto\hash\mcmhash.c" />
+    <ClCompile Include="crypto\hash\test.c">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="crypto\wots\wots.c" />
+    <ClCompile Include="crypto\wots\wotshash.c">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="crypto\xo4.c">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+    </ClCompile>
     <ClCompile Include="gui.cpp" />
     <ClCompile Include="gpu_wrapper.cpp" />
     <ClCompile Include="miner.cpp" />
-    <ClCompile Include="trigg_cl.cpp" />
+    <ClCompile Include="algo\trigg\trigg_cl.cpp" />
+    <ClCompile Include="sleep.cpp" />
     <ClCompile Include="wots.cpp" />
     <ClCompile Include="rand.cpp" />
     <ClCompile Include="crypto.cpp" />
-    <ClCompile Include="trigg.cpp" />
+    <ClCompile Include="algo\trigg\trigg.cpp" />
     <ClCompile Include="util.cpp" />
     <ClCompile Include="winminer.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="trigg_cl.cl" />
+    <None Include="algo\trigg\trigg_cl.cl" />
+    <None Include="crypto\hash\cpu\ATTRIBUTION" />
+    <None Include="crypto\hash\README" />
+    <None Include="crypto\wots\ATTRIBUTION" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="mochimo-winminer.rc" />
@@ -122,6 +229,6 @@
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
-    <Import Project="$(VCTargetsPath)\BuildCustomizations\CUDA 10.0.targets" />
+    <Import Project="$(VCTargetsPath)\BuildCustomizations\CUDA 10.1.targets" />
   </ImportGroup>
 </Project>

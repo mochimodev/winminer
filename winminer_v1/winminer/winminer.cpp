@@ -31,13 +31,6 @@ char *WebAddress = "https://www.mochimap.net/";
 /* Only used if no other server can be found.         */
 word32 Coreplist[CORELISTLEN] = {
    0x332a9741,    /* 65.151.42.11 */
-   0x342a9741,
-   0x352a9741,
-   0x362a9741,
-   0x372a9741,
-   0x382a9741,
-   0x392a9741,
-   0x402a9741,
 };
 
 #define USER_AGENT L"Mochimo Winminer/" WINMINER_VERSION
@@ -154,7 +147,7 @@ void download_file(char *url) {
 		printf("WinHttpConnect failed: Error %u\n", GetLastError());
 		return;
 	}
-	HINTERNET hRequest = WinHttpOpenRequest(hConnect, L"GET", file, NULL, WINHTTP_NO_REFERER, NULL, WINHTTP_FLAG_SECURE);
+	HINTERNET hRequest = WinHttpOpenRequest(hConnect, L"GET", file, NULL, WINHTTP_NO_REFERER, NULL, secure ? WINHTTP_FLAG_SECURE : 0);
 	if (!hRequest) {
 		printf("WinHttpOpenRequest failed: Error: %u\n", GetLastError());
 		return;

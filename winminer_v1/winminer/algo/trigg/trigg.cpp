@@ -8,7 +8,7 @@
  *
 */
 
-#include "winminer.h"
+#include "../../winminer.h"
 
 
 int Tdiff;
@@ -66,6 +66,20 @@ char *trigg_expand(byte *in, int diff)
 		if (bp[-1] != '\n') *bp++ = ' ';
 	}
 	return (char *)&Tchain[32];
+}
+
+void trigg_expand2(byte *in, byte *out) {
+	int j;
+	byte *w;
+
+	memset(out, 0, 256);
+
+	for (j = 0; j < 16; j++, in++) {
+		if (*in == NIL) break;
+		w = TPTR(*in);
+		while (*w) *out++ = *w++;
+		if (out[-1] != '\n') *out++ = ' ';
+	}
 }
 
 byte *trigg_gen(byte *in)

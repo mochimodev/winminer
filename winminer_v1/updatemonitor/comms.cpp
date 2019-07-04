@@ -140,7 +140,7 @@ int rx2(NODE *np, int checkids)
 
 int callserver(NODE *np, word32 ip)
 {
-	int ecode, j;
+	int ecode;
 
 	Sigint = 0;
 	memset(np, 0, sizeof(NODE));
@@ -187,7 +187,8 @@ int get_block3(NODE *np, char *fname)
 {
 	FILE *fp;
 	word16 len;
-	int n, ecode;
+	size_t n;
+	int ecode;
 
 	if (Trace) printf("get_block3() Recfile is '%s'\n", fname);
 
@@ -241,7 +242,8 @@ int get_cblock(word32 ip, char *fname)
 int send_file(NODE *np, char *fname)
 {
 	TX *tx;
-	int n, status;
+	uint16_t n;
+	int status;
 	FILE *fp;
 
 	tx = &np->tx;
