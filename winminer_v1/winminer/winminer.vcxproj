@@ -145,6 +145,7 @@
     <ClInclude Include="crypto\wots\wots.h" />
     <ClInclude Include="gui.h" />
     <ClInclude Include="gpu_wrapper.h" />
+    <ClInclude Include="helpers.h" />
     <ClInclude Include="helper_cuda.h" />
     <ClInclude Include="helper_string.h" />
     <ClInclude Include="miner.h" />
@@ -205,6 +206,7 @@
     </ClCompile>
     <ClCompile Include="gui.cpp" />
     <ClCompile Include="gpu_wrapper.cpp" />
+    <ClCompile Include="helpers.cpp" />
     <ClCompile Include="miner.cpp" />
     <ClCompile Include="algo\trigg\trigg_cl.cpp" />
     <ClCompile Include="sleep.cpp" />

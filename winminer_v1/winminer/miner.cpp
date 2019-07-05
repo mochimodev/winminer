@@ -87,30 +87,33 @@ int miner(char *blockin, char *blockout, char *addrfile, Compute_Type ct)
 		printf("\nDetected %d compatible GPUs", initGPU);
 		for (htime = time(NULL), hcount = 0; ; ) {
 			if (!Running) break;
-			cuda_peach((byte*)&bt, (uint32_t*)&hps, &Running);
+			//cuda_peach((byte*)&bt, (uint32_t*)&hps, &Running);
+			int32_t solved = cuda_peach2((byte*)&bt, (uint32_t*)&hps);
 			
-			// Block validation check
-			if (peach(&bt, get32(bt.difficulty), NULL, 1)) {
-				byte *bt_bytes = (byte*)&bt;
-				char hex[124 * 4];
-				for (int i = 0; i < 124; i++) {
-					sprintf(hex + i * 4, "%03i", bt_bytes[i]);
+			if (solved) {
+				// Block validation check
+				if (peach(&bt, get32(bt.difficulty), NULL, 1)) {
+					byte *bt_bytes = (byte*)&bt;
+					char hex[124 * 4];
+					for (int i = 0; i < 124; i++) {
+						sprintf(hex + i * 4, "%03i", bt_bytes[i]);
+					}
+
+					printf("!!!!CUDA Peach solved block is not valid!!!!!\n");
+					printf("CPU BT -> %s\n", hex);
+					Sleep(5000);
+					free_cuda_peach();
+					break;
 				}
 
-				printf("!!!!CUDA Peach solved block is not valid!!!!!\n");
-				printf("CPU BT -> %s\n", hex);
-				Sleep(5000);
-				free_cuda_peach();
-				break;
-			}
+				// Print Haiku
+				char phaiku[256];
+				trigg_expand2(bt.nonce, (byte*)phaiku);
+				printf("\n%s\n\n", phaiku);
+				//haiku = trigg_generate_gpu(bt.mroot, (uint32_t*)&hcount, ct);
 
-			// Print Haiku
-			char phaiku[256];
-			trigg_expand2(bt.nonce, (byte*)phaiku);
-			printf("\n%s\n\n", phaiku);
-			//haiku = trigg_generate_gpu(bt.mroot, (uint32_t*)&hcount, ct);
-			
-			printf("\n\n\n\nBLOCK SOLVED!!!!!\n\n\n\n");
+				printf("\n\n\n\nBLOCK SOLVED!!!!!\n\n\n\n");
+			}
 
 			etime = (time(NULL) - htime);
 			if (etime >= 10) {
@@ -118,16 +121,24 @@ int miner(char *blockin, char *blockout, char *addrfile, Compute_Type ct)
 				hcount = 0;
 				htime = time(NULL);
 				loopcount++;
-				printf("\n\nStatus (solving):  HPS: %luM/h Now Solving: 0x%s  Diff: %d  TX Count: %lu Blocks Solved: %d\n",
+
+				hps = 0;
+				for (int i = 0; i < initGPU; i++) {
+					printf("GPU %d: %d H/s\n", i, peach_ctx[i].ahps);
+					hps += peach_ctx[i].ahps;
+				}
+
+				printf("\n\nStatus (solving):  HPS: %lu H/s Now Solving: 0x%s  Diff: %d  TX Count: %lu Blocks Solved: %d\n",
 					(unsigned long)hps, bnum2hex(bt.bnum), bt.difficulty[0], (unsigned long)get32(bt.tcount), solvedblocks);
+
 				set_status("solving");
-				haikurate = hps;
+				haikurate = hps / 1000;
 				current_block = *((uint64_t*)bt.bnum);
 				current_diff = bt.difficulty[0];
 				tx_count = (uint64_t)get32(bt.tcount);
 				blocks_solved = solvedblocks;
 			}
-			if (haiku != NULL) break;
+			if (solved) break;
 			if (exists("restart.lck")) {
 				printf("\nNetwork Block Update Detected, Downloading new block to mine.");
 				set_status("updating block");
@@ -140,8 +151,6 @@ int miner(char *blockin, char *blockout, char *addrfile, Compute_Type ct)
 				Running = 0;
 			}
 			Sleep(1);
-
-			break; // TODO: FIX THIS
 		}
 		//trigg_free_gpu(ct);
 		free_cuda_peach();

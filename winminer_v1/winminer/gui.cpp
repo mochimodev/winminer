@@ -211,7 +211,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
 		snprintf(buf, 200, "Devices: CUDA: %d, OpenCL: %d", num_cuda, num_opencl);
 		put_text(hDc, 139, 148, buf);
 
-		snprintf(buf, 200, "Haikurate: % 10llu MH/s", haikurate);
+		snprintf(buf, 200, "Haikurate: % 10llu kH/s", haikurate);
 		put_text(hDc, 139, 164, buf);
 
 

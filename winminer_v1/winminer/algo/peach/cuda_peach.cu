@@ -21,6 +21,8 @@
 
 #include "peach.h"
 #include "nighthash.cu"
+#include "../../helpers.h"
+#include "cuda_peach.h"
 
 byte *trigg_gen(byte *in);
 
@@ -262,16 +264,9 @@ __global__ void cuda_find_peach(uint32_t threads, uint8_t *g_map,
 
 extern "C" {
 
-typedef struct __peach_cuda_ctx {
-   byte init, curr_seed[16], next_seed[16];
-   byte *seed, *d_seed;
-   byte *input, *d_map;
-   int32_t *d_found;
-   cudaStream_t stream;
-} PeachCudaCTX;
-
 /* Max 63 GPUs Supported */
-PeachCudaCTX ctx[64];
+PeachCudaCTX peach_ctx[64];
+PeachCudaCTX *ctx = peach_ctx;
 dim3 grid(512);
 dim3 block(256);
 uint32_t threads = 131072;
@@ -496,7 +491,7 @@ __host__ void cuda_peach(byte *bt, uint32_t *hps, byte *runflag)
          /* Check if GPU has finished */
          cudaSetDevice(i);
          if(cudaStreamQuery(ctx[i].stream) == cudaSuccess) {
-			 printf("gpu completed, threads: %d\n", threads);
+			//printf("gpu completed, threads: %d\n", threads);
             cudaMemcpy(found, ctx[i].d_found, 4, cudaMemcpyDeviceToHost);
             if(*found==1) { /* SOLVED A BLOCK! */
                cudaMemcpy(ctx[i].seed, ctx[i].d_seed, 16, cudaMemcpyDeviceToHost);
@@ -509,7 +504,7 @@ __host__ void cuda_peach(byte *bt, uint32_t *hps, byte *runflag)
                                     cudaMemcpyHostToDevice, ctx[i].stream);
 			cudaStreamSynchronize(ctx[i].stream);
             /* Start GPU round */
-			printf("starting new gpu round\n");
+			//printf("starting new gpu round\n");
             cuda_find_peach<<<grid, block, 0, ctx[i].stream>>>(threads,
                                  ctx[i].d_map, ctx[i].d_found, ctx[i].d_seed);
 			if (cudaCheckError("cuda_peach()", i, __FILE__)) {
@@ -541,6 +536,87 @@ __host__ void cuda_peach(byte *bt, uint32_t *hps, byte *runflag)
    if(seconds == 0) seconds = 1;
    nHaiku /= seconds;
    *hps = (uint32_t) nHaiku;
+}
+
+
+
+__host__ int32_t cuda_peach2(byte *bt, uint32_t *hps)
+{
+	int i;
+	uint64_t lastnHaiku, nHaiku = 0;
+	time_t seconds = time(NULL);
+	for (i = 0; i < nGPU; i++) {
+		/* Prepare next seed for GPU... */
+		if (ctx[i].next_seed[0] == 0) {
+			/* ... generate first GPU seed (and expand as Haiku) */
+			trigg_gen(ctx[i].next_seed);
+
+			/* ... and prepare round data */
+			memcpy(ctx[i].input, bt, 92);
+			memcpy(ctx[i].input + 92, ctx[i].next_seed, 16);
+		}
+		/* Check if GPU has finished */
+		cudaSetDevice(i);
+		if (cudaStreamQuery(ctx[i].stream) == cudaSuccess) {
+			//printf("gpu completed, threads: %d\n", threads);
+			// Calculate per GPU HPS
+			ctx[i].t_end = timestamp_ms();
+			double tdiff = (ctx[i].t_end - ctx[i].t_start) / 1000.0;
+			ctx[i].hps_index = (ctx[i].hps_index + 1) % 3;
+			ctx[i].hps[ctx[i].hps_index] = threads / tdiff;
+			uint32_t shps = 0;
+			for (int j = 0; j < 3; j++) {
+				shps += ctx[i].hps[j];
+			}
+			ctx[i].ahps = shps / 3;
+			// End per GPU HPS
+
+			cudaMemcpy(found, ctx[i].d_found, 4, cudaMemcpyDeviceToHost);
+			if (*found == 1) { /* SOLVED A BLOCK! */
+				cudaMemcpy(ctx[i].seed, ctx[i].d_seed, 16, cudaMemcpyDeviceToHost);
+				memcpy(bt + 92, ctx[i].curr_seed, 16);
+				memcpy(bt + 92 + 16, ctx[i].seed, 16);
+				return 1;
+			}
+			/* Send new GPU round Data */
+			cudaMemcpyToSymbolAsync(c_input, ctx[i].input, 108, 0,
+				cudaMemcpyHostToDevice, ctx[i].stream);
+			cudaStreamSynchronize(ctx[i].stream);
+			/* Start GPU round */
+			//printf("starting new gpu round\n");
+			ctx[i].t_start = timestamp_ms();
+			cuda_find_peach << <grid, block, 0, ctx[i].stream >> > (threads,
+				ctx[i].d_map, ctx[i].d_found, ctx[i].d_seed);
+			if (cudaCheckError("cuda_peach()", i, __FILE__)) {
+				printf("CUDA ERROR\n");
+			}
+
+			/* Add to haiku count */
+			nHaiku += threads;
+
+			/* Store round vars aside for checks next loop */
+			memcpy(ctx[i].curr_seed, ctx[i].next_seed, 16);
+
+			ctx[i].next_seed[0] = 0;
+		}
+
+		/* Waiting on GPU? ... */
+		if (cudaCheckError("cuda_peach()", i, __FILE__)) {
+			return 0;
+		}
+	}
+
+	/* Chill a bit if nothing is happening */
+	if (lastnHaiku == nHaiku) msleep(1);
+	else lastnHaiku = nHaiku;
+
+
+	seconds = time(NULL) - seconds;
+	if (seconds == 0) seconds = 1;
+	nHaiku /= seconds;
+	*hps = (uint32_t)nHaiku;
+
+	return 0;
 }
 
 

@@ -60,6 +60,7 @@ int main(int argc, char **argv)
 		if (*ip == 0) {
 			/* No more IPs in core list, wait 100ms before next check*/
 			Sleep(100);
+			j = 0;
 			continue;
 		}
 		set_bnum(Cblocknum, ip);
@@ -71,7 +72,8 @@ int main(int argc, char **argv)
 				continue;
 			}
 			if(now >= update) {
-				intervalmultiplier *= 2;
+				//intervalmultiplier *= 2;
+				intervalmultiplier = 2;
 				printf("\nIntra-Block update.");
 			} else {
 				intervalmultiplier = 1;

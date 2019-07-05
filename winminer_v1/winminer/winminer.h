@@ -33,7 +33,7 @@
 #include "algo/trigg/trigg.h"
 #include "config.h"
 
-#define WINMINER_VERSION "1.6b1"
+#define WINMINER_VERSION "1.6b2"
 
 static const word32 v24trigger[2] = { V24TRIGGER, 0 };
 
