@@ -1,6 +1,6 @@
 The MD5HASH for these executables are:
 
-mochimo-winminer.exe     7f63110c4688fce3dfe64f3872bbcaa5
+mochimo-winminer.exe     28c65ed8847ac06ce9455a8027f6cf3c
 update-monitor.exe       26a50d1b70a1e98a45ae69976cfbf1b9
 
 
