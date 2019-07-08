@@ -17,6 +17,7 @@
 #include "winminer.h"
 
 #include <winhttp.h>
+#include <nvml.h>
 
 #pragma comment(lib, "winhttp.lib")
 #pragma comment(lib, "Ws2_32.lib")
@@ -49,6 +50,11 @@ int solvedblocks = 0;
 byte Running = 1;
 byte Trace;
 bool enable_gui = true;
+
+uint8_t enable_nvml = 0;
+GPU_t gpus[64] = { 0 };
+uint32_t num_gpus = 0;
+#define NVML_DLL "C:\\Program Files\\NVIDIA Corporation\\NVSMI\\NVML.DLL"
 
 void usage(void)
 {
@@ -256,6 +262,74 @@ int main(int argc, char **argv)
 			force_opencl = true;
 			break;
 		default:   usage();
+		}
+	}
+
+	int32_t num_cuda = 0;
+	cudaError_t cr = cudaGetDeviceCount(&num_cuda);
+	if (num_cuda > MAX_GPUS) num_cuda = MAX_GPUS;
+
+	for (int i = 0; i < num_cuda; i++) {
+		struct cudaDeviceProp p = { 0 };
+		cudaError_t cr = cudaGetDeviceProperties(&p, i);
+		printf("CUDA pciDomainID: %x, pciBusID: %x, pciDeviceID: %x\n", p.pciDomainID, p.pciBusID, p.pciDeviceID);
+		gpus[i].pciDomainId = p.pciDomainID;
+		gpus[i].pciBusId = p.pciBusID;
+		gpus[i].pciDeviceId = p.pciDeviceID;
+		gpus[i].cudaNum = i;
+		num_gpus++;
+	}
+
+	if (LoadLibrary(NVML_DLL) == NULL) {
+		printf("Failed to load NVML library.\n");
+	}
+	else {
+		enable_nvml = 1;
+	}
+
+	if (enable_nvml) {
+		nvmlReturn_t r = nvmlInit();
+		if (r != NVML_SUCCESS) {
+			printf("Failed to initialize NVML: %s\n", nvmlErrorString(r));
+		}
+		uint32_t nvml_device_count;
+		r = nvmlDeviceGetCount(&nvml_device_count);
+		if (r != NVML_SUCCESS) {
+			printf("Failed to get NVML device count: %s\n", nvmlErrorString(r));
+		}
+		printf("NVML Devices: %d\n", nvml_device_count);
+		for (int i = 0; i < nvml_device_count; i++) {
+			nvmlDevice_t dev;
+			r = nvmlDeviceGetHandleByIndex(i, &dev);
+			if (r != NVML_SUCCESS) {
+				printf("nvmlDeviceGetHandleByIndex failed: %s\n", nvmlErrorString(r));
+				nvml_device_count = i;
+				break;
+			}
+			nvmlPciInfo_t pci;
+			r = nvmlDeviceGetPciInfo(dev, &pci);
+			if (r != NVML_SUCCESS) {
+				printf("nvmlDeviceGetPciInfo failed: %s\n", nvmlErrorString(r));
+				continue;
+			}
+			printf("NVML PCI: pciDeviceId: %x, pciSubSystemId: %x, domain: %x, device: %x, bus: %x\n", pci.pciDeviceId, pci.pciSubSystemId, pci.domain, pci.device, pci.bus);
+
+			for (int j = 0; j < num_cuda; j++) {
+				if (gpus[j].pciDomainId == pci.domain && gpus[j].pciBusId == pci.bus && gpus[i].pciDeviceId == pci.device) {
+					printf("NVML device is CUDA Device: %d\n", gpus[j].cudaNum);
+					gpus[j].nvml_dev = dev;
+					break;
+				}
+			}
+
+			char device_name[128];
+			r = nvmlDeviceGetName(dev, device_name, 128);
+			if (r != NVML_SUCCESS) {
+				printf("nvmlDeviceGetName failed: %s\n", nvmlErrorString(r));
+			}
+			else {
+				printf("Device: %d, Name: %s\n", i, device_name);
+			}
 		}
 	}
 

@@ -214,6 +214,11 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
 		snprintf(buf, 200, "Haikurate: % 10llu kH/s", haikurate);
 		put_text(hDc, 139, 164, buf);
 
+		for (int i = 0; i < num_gpus; i++) {
+			snprintf(buf, 200, "[GPU %2d] Temp: %3d C, Power: %6.2f W", i, gpus[i].temp, gpus[i].power / 1000.0);
+			put_text(hDc, 139, 196 + i * 16, buf);
+		}
+
 
 		DeleteObject(hFont);
 		EndPaint(hWnd, &ps);

@@ -16,6 +16,7 @@
 extern "C" {
 #include "crypto/hash/cpu/keccak.h"
 }
+#include <nvml.h>
 
 uint64_t haikurate = 0;
 uint64_t current_block = 0;
@@ -89,7 +90,7 @@ int miner(char *blockin, char *blockout, char *addrfile, Compute_Type ct)
 			if (!Running) break;
 			//cuda_peach((byte*)&bt, (uint32_t*)&hps, &Running);
 			int32_t solved = cuda_peach2((byte*)&bt, (uint32_t*)&hps);
-			
+
 			if (solved) {
 				// Block validation check
 				if (peach(&bt, get32(bt.difficulty), NULL, 1)) {
@@ -124,11 +125,27 @@ int miner(char *blockin, char *blockout, char *addrfile, Compute_Type ct)
 
 				hps = 0;
 				for (int i = 0; i < initGPU; i++) {
-					printf("GPU %d: %d H/s\n", i, peach_ctx[i].ahps);
 					hps += peach_ctx[i].ahps;
+					uint32_t temp = 0;
+					uint32_t power = 0;
+					if (enable_nvml) {
+						nvmlReturn_t r = nvmlDeviceGetTemperature(gpus[i].nvml_dev, NVML_TEMPERATURE_GPU, &temp);
+						if (r != NVML_SUCCESS) {
+							printf("nvmlDeviceGetTemperature failed: %s\n", nvmlErrorString(r));
+						}
+
+						r = nvmlDeviceGetPowerUsage(gpus[i].nvml_dev, &power);
+						if (r != NVML_SUCCESS) {
+							printf("nvmlDeviceGetPowerUsage Failed: %s\n", nvmlErrorString(r));
+						}
+						gpus[i].temp = temp;
+						gpus[i].power = power;
+					}
+
+					printf("\nGPU %d: %d H/s, Temperature: %d C, Power: %5.2f W\n", i, peach_ctx[i].ahps, gpus[i].temp, gpus[i].power / 1000.0);
 				}
 
-				printf("\n\nStatus (solving):  HPS: %lu H/s Now Solving: 0x%s  Diff: %d  TX Count: %lu Blocks Solved: %d\n",
+				printf("Status (solving):  HPS: %lu H/s Now Solving: 0x%s  Diff: %d  TX Count: %lu Blocks Solved: %d\n",
 					(unsigned long)hps, bnum2hex(bt.bnum), bt.difficulty[0], (unsigned long)get32(bt.tcount), solvedblocks);
 
 				set_status("solving");

@@ -32,6 +32,7 @@
 #include "gpu_wrapper.h"
 #include "algo/trigg/trigg.h"
 #include "config.h"
+#include <nvml.h>
 
 #define WINMINER_VERSION "1.6b2"
 
@@ -55,8 +56,21 @@ extern byte Running;
 extern byte Trace;
 extern bool enable_gui;
 
+extern uint8_t enable_nvml;
 typedef int pid_t;
 
+typedef struct {
+	uint32_t pciDomainId;
+	uint32_t pciBusId;
+	uint32_t pciDeviceId;
+	nvmlDevice_t nvml_dev;
+	uint32_t cudaNum;
+	uint32_t temp;
+	uint32_t power;
+} GPU_t;
+#define MAX_GPUS 64
+extern GPU_t gpus[MAX_GPUS];
+extern uint32_t num_gpus;
 
 
 /* stripped-down NODE for rx2() and callserver(): */
