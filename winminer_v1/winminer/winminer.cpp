@@ -23,6 +23,7 @@
 #pragma comment(lib, "Ws2_32.lib")
 
 #include "gui.h"
+#include "helpers.h"
 
 char *Addrfile = "maddr.dat";
 char *Corefname = "fullnodes.lst";
@@ -50,6 +51,8 @@ int solvedblocks = 0;
 byte Running = 1;
 byte Trace;
 bool enable_gui = true;
+
+int64_t startup_time = 0;
 
 uint8_t enable_nvml = 0;
 GPU_t gpus[64] = { 0 };
@@ -332,6 +335,8 @@ int main(int argc, char **argv)
 			}
 		}
 	}
+
+	startup_time = timestamp_ms();
 
 	if (enable_gui) {
 		start_gui_thread();

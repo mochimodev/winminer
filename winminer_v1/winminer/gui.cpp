@@ -12,6 +12,8 @@
 #include "resource.h"
 
 #include "gui.h"
+#include "helpers.h"
+#include "algo/peach/cuda_peach.h"
 
 LRESULT CALLBACK WndProc(HWND, UINT, WPARAM, LPARAM);
 VOID CALLBACK RedrawTimerProc(HWND hWnd, UINT msg, UINT timerId, DWORD dwTime);
@@ -214,9 +216,23 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
 		snprintf(buf, 200, "Haikurate: % 10llu kH/s", haikurate);
 		put_text(hDc, 139, 164, buf);
 
+
+		int64_t time_now = timestamp_ms();
+		int64_t uptime = time_now - startup_time;
+		int64_t days = uptime / 86400000;
+		uptime -= days * 86400000;
+		int64_t hours = uptime / 3600000;
+		uptime -= hours * 3600000;
+		int64_t mins = uptime / 60000;
+		uptime -= mins * 60000;
+		int64_t secs = uptime / 1000;
+		snprintf(buf, 200, "Uptime: %3lld days, %2lld hours, %2lld minutes, %2lld seconds", days, hours, mins, secs);
+		put_text(hDc, 139, 180, buf);
+
+
 		for (int i = 0; i < num_gpus; i++) {
-			snprintf(buf, 200, "[GPU %2d] Temp: %3d C, Power: %6.2f W", i, gpus[i].temp, gpus[i].power / 1000.0);
-			put_text(hDc, 139, 196 + i * 16, buf);
+			snprintf(buf, 200, "[GPU %2d] Haikurate: %4d kH/s, Temp: %3d C, Power: %6.2f W", i, peach_ctx[i].ahps / 1000, gpus[i].temp, gpus[i].power / 1000.0);
+			put_text(hDc, 139, 212 + i * 16, buf);
 		}
 
 

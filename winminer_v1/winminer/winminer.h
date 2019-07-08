@@ -71,6 +71,7 @@ typedef struct {
 #define MAX_GPUS 64
 extern GPU_t gpus[MAX_GPUS];
 extern uint32_t num_gpus;
+extern int64_t startup_time;
 
 
 /* stripped-down NODE for rx2() and callserver(): */
