@@ -34,7 +34,7 @@
 #include "config.h"
 #include <nvml.h>
 
-#define WINMINER_VERSION "1.6b3"
+#define WINMINER_VERSION "1.6b4"
 
 static const word32 v24trigger[2] = { V24TRIGGER, 0 };
 
