@@ -10,26 +10,27 @@
 
 #include "gpu_wrapper.h"
 #include "miner.h"
+#include <stdio.h>
 
-int trigg_init_gpu(byte difficulty, byte *blockNumber, Compute_Type ct) {
+int peach_init_gpu(byte difficulty, byte *prevhash, byte *blockNumber, Compute_Type ct) {
 	switch (ct) {
 	case CT_CUDA:
-		return trigg_init_cuda(difficulty, blockNumber);
+		return init_cuda_peach(difficulty, prevhash, blockNumber);
 	case CT_OPENCL:
-		return trigg_init_cl(difficulty, blockNumber);
+		return peach_init_cl(difficulty, prevhash, blockNumber);
 	default:
 		printf("Unknown compute type\n");
 		return 0;
 	}
 }
 
-char *trigg_generate_gpu(byte *mroot, uint32_t *nHaiku, Compute_Type ct) {
+int32_t peach_generate_gpu(byte *bt, uint32_t *hps, Compute_Type ct) {
 	switch (ct) {
 	case CT_CUDA:
-		return trigg_generate_cuda(mroot, nHaiku);
+		return cuda_peach2(bt, hps);
 		break;
 	case CT_OPENCL:
-		return trigg_generate_cl(mroot, nHaiku);
+		return peach_generate_cl(bt, hps);
 		break;
 	default:
 		printf("Unknown compute type\n");
@@ -37,13 +38,13 @@ char *trigg_generate_gpu(byte *mroot, uint32_t *nHaiku, Compute_Type ct) {
 	}
 }
 
-void trigg_free_gpu(Compute_Type ct) {
+void peach_free_gpu(Compute_Type ct) {
 	switch (ct) {
 	case CT_CUDA:
-		trigg_free_cuda();
+		free_cuda_peach();
 		break;
 	case CT_OPENCL:
-		trigg_free_cl();
+		//peach_free_cl();
 		break;
 	default:
 		printf("Unknown compute type\n");
@@ -58,6 +59,20 @@ int count_devices(Compute_Type ct) {
 		break;
 	case CT_OPENCL:
 		return count_devices_cl();
+		break;
+	default:
+		printf("Unknown compute type\n");
+		return CT_CUDA;
+	}
+}
+
+uint32_t gpu_get_ahps(uint32_t device, Compute_Type ct) {
+	switch (ct) {
+	case CT_CUDA:
+		return cuda_get_ahps(device);
+		break;
+	case CT_OPENCL:
+		return cl_get_ahps(device);
 		break;
 	default:
 		printf("Unknown compute type\n");

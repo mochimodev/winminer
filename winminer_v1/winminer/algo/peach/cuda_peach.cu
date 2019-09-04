@@ -619,5 +619,22 @@ __host__ int32_t cuda_peach2(byte *bt, uint32_t *hps)
 	return 0;
 }
 
+__host__ int count_devices_cuda() {
+	int num_devices;
+	/* Obtain and check system GPU count */
+	cudaGetDeviceCount(&num_devices);
+	cudaError_t err = cudaGetLastError();
+	if (cudaSuccess != err) {
+		fprintf(stderr,
+			"Unable to count CUDA devices, error: (%d) %s.\n",
+			static_cast<int>(err), cudaGetErrorString(err));
+		return 0;
+	}
+	return num_devices;
+}
+
+__host__ uint32_t cuda_get_ahps(uint32_t device) {
+	return peach_ctx[device].ahps;
+}
 
 }

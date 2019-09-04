@@ -80,7 +80,7 @@
     <CudaCompile>
       <TargetMachinePlatform>64</TargetMachinePlatform>
       <Optimization>InheritFromHost</Optimization>
-      <CodeGeneration>compute_61,sm_61;compute_75,sm_75</CodeGeneration>
+      <CodeGeneration>compute_50,sm_50;compute_52,sm_52;compute_60,sm_60;compute_61,sm_61;compute_70,sm_70;compute_75,sm_75</CodeGeneration>
     </CudaCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
@@ -93,8 +93,11 @@
       <CodeGeneration Condition="'$(Configuration)|$(Platform)'=='Release|x64'">compute_61,sm_61;compute_70,sm_70</CodeGeneration>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
     </CudaCompile>
-    <CudaCompile Include="algo\trigg\trigg_cuda.cu" />
+    <CudaCompile Include="algo\trigg\trigg_cuda.cu">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+    </CudaCompile>
     <ClInclude Include="algo\peach\cuda_peach.h" />
+    <ClInclude Include="algo\peach\peach_cl.h" />
     <ClInclude Include="crypto\hash\cuda\blake2b.cu">
       <FileType>Document</FileType>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
@@ -166,6 +169,7 @@
     <ClCompile Include="algo\peach\peach.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</ExcludedFromBuild>
     </ClCompile>
+    <ClCompile Include="algo\peach\peach_cl.cpp" />
     <ClCompile Include="algo\v24\v24.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
     </ClCompile>
@@ -209,7 +213,9 @@
     <ClCompile Include="gpu_wrapper.cpp" />
     <ClCompile Include="helpers.cpp" />
     <ClCompile Include="miner.cpp" />
-    <ClCompile Include="algo\trigg\trigg_cl.cpp" />
+    <ClCompile Include="algo\trigg\trigg_cl.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+    </ClCompile>
     <ClCompile Include="sleep.cpp" />
     <ClCompile Include="wots.cpp" />
     <ClCompile Include="rand.cpp" />

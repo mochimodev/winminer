@@ -486,24 +486,25 @@ uint32_t sm_chain[JUMP];
          n += 8;
       }
 
-	  //if (n >= c_difficulty && !atomic_xchg(g_found, 1)) {
-	  if (thread == 122868 && !atomic_xchg(g_found,1)) {
+if (n>=c_difficulty) {
+	printf("found!! t: %d, n: %d\n", thread, n);
+}
+	  if (n >= c_difficulty && !atomic_xchg(g_found, 1)) {
+	  //if (thread == 122868 && !atomic_xchg(g_found,1)) {
 		  /* PRINCESS FOUND! */
+#ifdef DEBUG
 		  printf("t: %d, n: %d\n", thread, n);
 		  printf("sm: %d, %d, %d, %d, %d, %d, %d, %d\n",
 				  sm_chain[0], sm_chain[1], sm_chain[2], sm_chain[3],
 				  sm_chain[4], sm_chain[5], sm_chain[6], sm_chain[7]);
+#endif
          #pragma unroll
          for (i = 0; i < 16; i++) {
             g_seed[i] = seed[i];
             //g_seed[i] = l_tile[i];
 	    //g_seed[i] = l_input[i];
 	 }
-         /*for (i = 0; i < JUMP; i++) {
-            g_seed[i] = sm_chain[i];
-	    //g_seed[i] = l_input[i];
-	 }*/
-//#ifdef DEBUG
+#ifdef DEBUG
 		printf("n: %d, c_difficulty: %d\n", n, c_difficulty);
 		printf16("seed: ", seed);
 		printf32("hash: ", fhash);
@@ -519,7 +520,7 @@ uint32_t sm_chain[JUMP];
 		}
 		printf("\n");
 #endif
-//#endif
+#endif
       }
       /* Our princess is in another castle ! */
    }

@@ -75,7 +75,7 @@ int miner(char *blockin, char *blockout, char *addrfile, Compute_Type ct)
 			bnum2hex(bt.bnum));
 
 		// v2.4 and later
-		if ((initGPU = init_cuda_peach(bt.difficulty[0], bt.phash, bt.bnum)) < 1) {
+		if ((initGPU = peach_init_gpu(bt.difficulty[0], bt.phash, bt.bnum, ct)) < 1) {
 			printf("Failed to initialize GPU devices\n");
 			break;
 		}
@@ -89,7 +89,7 @@ int miner(char *blockin, char *blockout, char *addrfile, Compute_Type ct)
 		for (htime = time(NULL), hcount = 0; ; ) {
 			if (!Running) break;
 			//cuda_peach((byte*)&bt, (uint32_t*)&hps, &Running);
-			int32_t solved = cuda_peach2((byte*)&bt, (uint32_t*)&hps);
+			int32_t solved = peach_generate_gpu((byte*)&bt, (uint32_t*)&hps, ct);
 
 			if (solved) {
 				// Block validation check
@@ -102,8 +102,8 @@ int miner(char *blockin, char *blockout, char *addrfile, Compute_Type ct)
 
 					printf("!!!!CUDA Peach solved block is not valid!!!!!\n");
 					printf("CPU BT -> %s\n", hex);
-					Sleep(5000);
-					free_cuda_peach();
+					Sleep(15000);
+					peach_free_gpu(ct);
 					break;
 				}
 
@@ -125,7 +125,7 @@ int miner(char *blockin, char *blockout, char *addrfile, Compute_Type ct)
 
 				hps = 0;
 				for (int i = 0; i < initGPU; i++) {
-					hps += peach_ctx[i].ahps;
+					hps += gpu_get_ahps(i, ct);
 					uint32_t temp = 0;
 					uint32_t power = 0;
 					if (enable_nvml) {
@@ -142,7 +142,7 @@ int miner(char *blockin, char *blockout, char *addrfile, Compute_Type ct)
 						gpus[i].power = power;
 					}
 
-					printf("\nGPU %d: %d H/s, Temperature: %d C, Power: %5.2f W\n", i, peach_ctx[i].ahps, gpus[i].temp, gpus[i].power / 1000.0);
+					printf("\nGPU %d: %d H/s, Temperature: %d C, Power: %5.2f W\n", i, gpu_get_ahps(i, ct), gpus[i].temp, gpus[i].power / 1000.0);
 				}
 
 				printf("Status (solving):  HPS: %lu H/s Now Solving: 0x%s  Diff: %d  TX Count: %lu Blocks Solved: %d\n",
@@ -160,7 +160,7 @@ int miner(char *blockin, char *blockout, char *addrfile, Compute_Type ct)
 				printf("\nNetwork Block Update Detected, Downloading new block to mine.");
 				set_status("updating block");
 				//trigg_free_gpu(ct);
-				free_cuda_peach();
+				peach_free_gpu(ct);
 				return VERROR;
 			}
 			if (enable_gui && check_gui_thread_alive() != 1) {
@@ -170,7 +170,7 @@ int miner(char *blockin, char *blockout, char *addrfile, Compute_Type ct)
 			Sleep(1);
 		}
 		//trigg_free_gpu(ct);
-		free_cuda_peach();
+		peach_free_gpu(ct);
 		if (!Running) break;
 
 		/*if (!trigg_check(bt.mroot, bt.difficulty[0], bt.bnum)) {

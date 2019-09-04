@@ -1,4 +1,7 @@
 #pragma once
+
+#include "../../helper_cuda.h"
+#include <cuda_runtime.h>
 #include <stdint.h>
 #include "../../types.h"
 
@@ -21,4 +24,6 @@ extern "C" {
 	} PeachCudaCTX;
 
 	extern PeachCudaCTX peach_ctx[64];
+	__host__ int count_devices_cuda();
+	__host__ uint32_t cuda_get_ahps(uint32_t device);
 }
