@@ -181,6 +181,7 @@ int peach_init_cl(byte difficulty, byte *prevhash, byte *blocknumber) {
 
 	for (cl_uint i = 0; i < num_devices; i++) {
 		cl_int err;
+		printf("Initializing device: %d\n", i);
 		if (ctx[i].init == 0) {
 			ctx[i].context = clCreateContext(properties, 1, &(device_id[i]), NULL, NULL, &err);
 			if (CL_SUCCESS != err) {
@@ -201,7 +202,8 @@ int peach_init_cl(byte difficulty, byte *prevhash, byte *blocknumber) {
 			cl_program prog_blake2b = opencl_compile_source(ctx[i].context, 1, &device_id[i], IDR_OPENCL_BLAKE2B, "-cl-fp32-correctly-rounded-divide-sqrt");
 			cl_program prog_peach = opencl_compile_source(ctx[i].context, 1, &device_id[i], IDR_OPENCL_PEACH, "-cl-fp32-correctly-rounded-divide-sqrt");
 			cl_program prog_parts[] = { prog_peach, prog_md5, prog_sha1, prog_sha256, prog_md2, prog_keccak, prog_blake2b };
-			cl_program prog = clLinkProgram(ctx[i].context, 1, &device_id[0], NULL, 7, prog_parts, NULL, NULL, &err);
+			//printf("Linking program\n");
+			cl_program prog = clLinkProgram(ctx[i].context, 1, &device_id[i], NULL, 7, prog_parts, NULL, NULL, &err);
 			if (CL_SUCCESS != err) {
 				printf("clLinkProgram failed. Error: %d\n", err);
 				return -1;
@@ -321,7 +323,7 @@ int peach_init_cl(byte difficulty, byte *prevhash, byte *blocknumber) {
 				printf("clFinish failed. Error: %d\n", err);
 			}
 			cl_ulong size;
-			clGetDeviceInfo(device_id[0], CL_DEVICE_LOCAL_MEM_SIZE, sizeof(cl_ulong), &size, 0);
+			clGetDeviceInfo(device_id[i], CL_DEVICE_LOCAL_MEM_SIZE, sizeof(cl_ulong), &size, 0);
 			printf("CL_DEVICE_LOCAL_MEM_SIZE: %ld\n", size);
 			printf("Running build_map\n");
 			size_t build_map_work_size = 4096;

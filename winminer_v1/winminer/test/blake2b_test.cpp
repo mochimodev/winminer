@@ -168,7 +168,7 @@ int trigg_init_cl(uint8_t  difficulty, uint8_t *blockNumber) {
 
 		cl_program prog_blake2b = opencl_compile_source(ctx[i].context, 1, &device_id[i], "../crypto/hash/opencl/cl_blake2b.cl", "-cl-fp32-correctly-rounded-divide-sqrt");
 		cl_program prog_parts[] = {prog_blake2b};
-		cl_program prog = clLinkProgram(ctx[i].context, 1, &device_id[0], NULL, 1, prog_parts, NULL, NULL, &err);
+		cl_program prog = clLinkProgram(ctx[i].context, 1, &device_id[i], NULL, 1, prog_parts, NULL, NULL, &err);
 		if (CL_SUCCESS != err) {
 			printf("clLinkProgram failed. Error: %d\n", err);
 			exit(1);
@@ -216,7 +216,7 @@ int trigg_init_cl(uint8_t  difficulty, uint8_t *blockNumber) {
 		}
 
 		cl_ulong size;
-		clGetDeviceInfo(device_id[0], CL_DEVICE_LOCAL_MEM_SIZE, sizeof(cl_ulong), &size, 0);
+		clGetDeviceInfo(device_id[i], CL_DEVICE_LOCAL_MEM_SIZE, sizeof(cl_ulong), &size, 0);
 		printf("CL_DEVICE_LOCAL_MEM_SIZE: %ld\n", size);
 		printf("Running blake2b\n");
 		size_t blake2b_work_size = NUM_HASHES;
