@@ -95,25 +95,6 @@ typedef struct {
 	int len;
 } CUDA_MD2_CTX;
 
-#define KECCAK_ROUND 24
-#define KECCAK_STATE_SIZE 25
-#define KECCAK_Q_SIZE 192
-typedef struct {
-
-    BYTE sha3_flag;
-    WORD digestbitlen;
-    uint64_t rate_bits;
-    uint64_t rate_BYTEs;
-    uint64_t absorb_round;
-
-    int64_t state[KECCAK_STATE_SIZE];
-    BYTE q[KECCAK_Q_SIZE];
-
-    uint64_t bits_in_queue;
-
-} cl_keccak_ctx_t;
-typedef cl_keccak_ctx_t CUDA_KECCAK_CTX;
-
 #define BLAKE2B_ROUNDS 12
 #define BLAKE2B_BLOCK_LENGTH 128
 #define BLAKE2B_CHAIN_SIZE 8
@@ -161,8 +142,6 @@ typedef struct {
 	   cl_blake2b_ctx_t blake2b;
 	   CUDA_SHA1_CTX sha1;
 	   CUDA_SHA256_CTX sha256;
-	   CUDA_KECCAK_CTX sha3;
-	   CUDA_KECCAK_CTX keccak;
 	   CUDA_MD2_CTX md2;
 	   CUDA_MD5_CTX md5;
    };
@@ -184,10 +163,10 @@ void cl_blake2b_final(cl_blake2b_ctx_t *ctx, BYTE* out);
 void cl_sha1_init(CUDA_SHA1_CTX *ctx);
 void cl_sha1_update(CUDA_SHA1_CTX *ctx, BYTE data[], size_t len);
 void cl_sha1_final(CUDA_SHA1_CTX *ctx, BYTE hash[]);
-void cl_keccak_init(cl_keccak_ctx_t *ctx, WORD digestbitlen);
-void cl_keccak_sha3_init(cl_keccak_ctx_t *ctx, WORD digestbitlen);
-void cl_keccak_update(cl_keccak_ctx_t *ctx, BYTE *in, uint64_t inlen, uint8_t debug);
-void cl_keccak_final(cl_keccak_ctx_t *ctx, BYTE *out, uint8_t debug);
+void Keccak256Digest36B(ulong *Digest, const ulong *Input);
+void Keccak256Digest1060B(ulong *Digest, const ulong *Input);
+void SHA3256Digest36B(ulong *Digest, const ulong *Input);
+void SHA3Digest1060B(uint64_t *Digest, const uint64_t *Input);
 void cl_md2_init(CUDA_MD2_CTX *ctx);
 void cl_md2_update(CUDA_MD2_CTX *ctx, BYTE data[], size_t len);
 void cl_md2_final(CUDA_MD2_CTX *ctx, BYTE hash[]);
@@ -255,11 +234,17 @@ uint32_t cl_next_index(uint32_t index, __global uint8_t *g_map, uint8_t *nonce, 
    /* Setup nighthash the seed, NO TRANSFORM */
    cl_nighthash_init(&nighthash, seed, seedlen, index, 0, debug);
 
-   /* Update nighthash with the seed data */
-   cl_nighthash_update(&nighthash, seed, seedlen, debug);
+   if (nighthash.algo_type == 4) {
+	   SHA3Digest1060B((ulong*)hash, (ulong*)seed);
+   } else if (nighthash.algo_type == 5) {
+	   Keccak256Digest1060B((ulong*)hash, (ulong*)seed);
+   } else {
+	   /* Update nighthash with the seed data */
+	   cl_nighthash_update(&nighthash, seed, seedlen, debug);
 
-   /* Finalize nighthash into the first 32 byte chunk of the tile */
-   cl_nighthash_final(&nighthash, hash, debug);
+	   /* Finalize nighthash into the first 32 byte chunk of the tile */
+	   cl_nighthash_final(&nighthash, hash, debug);
+   }
 
    /* Convert 32-byte Hash Value Into 8x 32-bit Unsigned Integer */
    for(i = 0, index = 0; i < 8; i++) {
@@ -275,7 +260,7 @@ void cl_gen_tile(uint32_t index, __global uint8_t *g_map, uint8_t debug, __globa
    CUDA_NIGHTHASH_CTX nighthash;
    uint8_t seed[4 + HASHLEN];
    global uint8_t *tilep;
-   uint8_t local_out[HASHLEN];
+   uint8_t local_out[4 + HASHLEN];
    int i, j, seedlen;
 
    /* Set map pointer */
@@ -294,11 +279,19 @@ void cl_gen_tile(uint32_t index, __global uint8_t *g_map, uint8_t debug, __globa
    /* Setup nighthash with a transform of the seed */
    cl_nighthash_init(&nighthash, seed, seedlen, index, 1, debug);
 
-   /* Update nighthash with the seed data */
-   cl_nighthash_update(&nighthash, seed, seedlen, debug);
+   if (nighthash.algo_type == 4) {
+   	SHA3256Digest36B((ulong*)local_out, (ulong*)seed);
+   } else if (nighthash.algo_type == 5) {
+   	Keccak256Digest36B((ulong*)local_out, (ulong*)seed);
+   } else {
 
-   /* Finalize nighthash into the first 32 byte chunk of the tile */
-   cl_nighthash_final(&nighthash, local_out, debug);
+	   /* Update nighthash with the seed data */
+	   cl_nighthash_update(&nighthash, seed, seedlen, debug);
+
+	   /* Finalize nighthash into the first 32 byte chunk of the tile */
+	   cl_nighthash_final(&nighthash, local_out, debug);
+   }
+
    for (int i = 0; i < HASHLEN; i++) {
 	   tilep[i] = local_out[i];
    }
@@ -311,22 +304,29 @@ void cl_gen_tile(uint32_t index, __global uint8_t *g_map, uint8_t debug, __globa
 	   for (int z = 0; z < HASHLEN; z++) {
 		   tilep[i+z] = local_out[z];
 	   }
+	   // Copy index to end of local_out
+	   for (int z = 0; z < 4; z++) {
+		   local_out[HASHLEN+z] = ((uint8_t*)&index)[z];
+	   }
 
-	   /* Update nighthash with the seed data and tile index */
-	   cl_nighthash_update(&nighthash, local_out, HASHLEN, debug);
-	   cl_nighthash_update(&nighthash, (uint8_t *) &index, 4, debug);
+	   if (nighthash.algo_type == 4) {
+		   SHA3256Digest36B((ulong*)local_out, (ulong*)local_out);
+	   } else if (nighthash.algo_type == 5) {
+		   Keccak256Digest36B((ulong*)local_out, (ulong*)local_out);
+	   } else {
+		   /* Update nighthash with the seed data and tile index */
+		   cl_nighthash_update(&nighthash, local_out, HASHLEN+4, debug);
+		   //cl_nighthash_update(&nighthash, (uint8_t *) &index, 4, debug);
 
-	   /* Finalize nighthash into the first 32 byte chunk of the tile */
-	   /*if (debug) {
-		   printf("tilep[%d] = %02x\n", i, local_out[0]);
-	   }*/
-	   cl_nighthash_final(&nighthash, local_out, debug);
+		   /* Finalize nighthash into the first 32 byte chunk of the tile */
+		   /*if (debug) {
+			   printf("tilep[%d] = %02x\n", i, local_out[0]);
+		   }*/
+		   cl_nighthash_final(&nighthash, local_out, debug);
+	   }
 	   for (int z = 0; z < HASHLEN; z++) {
 		   tilep[j+z] = local_out[z];
 	   }
-	   /*if (debug) {
-		   printf("tilep[%d] = %02x\n", j, local_out[0]);
-	   }*/
    }
 }
 
@@ -856,10 +856,10 @@ void cl_nighthash_init(CUDA_NIGHTHASH_CTX *ctx, uint8_t *algo_type_seed,
          cl_sha256_init(&(ctx->sha256));
          break;
       case 4:
-         cl_keccak_sha3_init(&(ctx->sha3), 256);
+         //cl_keccak_sha3_init(&(ctx->sha3), 256);
          break;
       case 5:
-         cl_keccak_init(&(ctx->keccak), 256);
+         //cl_keccak_init(&(ctx->keccak), 256);
          break;
       case 6:
          cl_md2_init(&(ctx->md2));
@@ -929,28 +929,10 @@ void cl_nighthash_update(CUDA_NIGHTHASH_CTX *ctx, uint8_t *in, uint32_t inlen, u
 #endif
          break;
       case 4:
-         cl_keccak_update(&(ctx->sha3), in, inlen, debug);
-#ifdef DEBUG
-		 if (debug) {
-			 printf("sha3 update: ");
-			 for (int i = 0; i < inlen; i+=4) {
-				 printf("%02x %02x %02x %02x ", in[i], in[i+1], in[i+2], in[i+3]);
-			 }
-			 printf("\n");
-		 }
-#endif
+         //cl_keccak_update(&(ctx->sha3), in, inlen, debug);
          break;
       case 5:
-         cl_keccak_update(&(ctx->keccak), in, inlen, debug);
-#ifdef DEBUG
-		 if (debug) {
-			 printf("keccak update: ");
-			 for (int i = 0; i < inlen; i++) {
-				 printf("%02x ", in[i]);
-			 }
-			 printf("\n");
-		 }
-#endif
+         //cl_keccak_update(&(ctx->keccak), in, inlen, debug);
          break;
       case 6:
          cl_md2_update(&(ctx->md2), in, inlen);
@@ -1084,52 +1066,10 @@ void cl_nighthash_final(CUDA_NIGHTHASH_CTX *ctx, uint8_t *out, uint8_t debug)
 #endif
          break;
       case 4:
-         cl_keccak_final(&(ctx->sha3), out, debug);
-#ifdef DEBUG
-		 if (debug) {
-			 printf("sha3 final: "
-					 "%02x %02x %02x %02x "
-					 "%02x %02x %02x %02x "
-					 "%02x %02x %02x %02x "
-					 "%02x %02x %02x %02x "
-					 "%02x %02x %02x %02x "
-					 "%02x %02x %02x %02x "
-					 "%02x %02x %02x %02x "
-					 "%02x %02x %02x %02x\n",
-					 out[0], out[1], out[2], out[3],
-					 out[4], out[5], out[6], out[7],
-					 out[8], out[9], out[10], out[11],
-					 out[12], out[13], out[14], out[15],
-					 out[16], out[17], out[18], out[19],
-					 out[20], out[21], out[22], out[23],
-					 out[24], out[25], out[26], out[27],
-					 out[28], out[29], out[30], out[31]);
-		 }
-#endif
+         //cl_keccak_final(&(ctx->sha3), out, debug);
          break;
       case 5:
-         cl_keccak_final(&(ctx->keccak), out, debug);
-#ifdef DEBUG
-		 if (debug) {
-			 printf("keccak final: "
-					 "%02x %02x %02x %02x "
-					 "%02x %02x %02x %02x "
-					 "%02x %02x %02x %02x "
-					 "%02x %02x %02x %02x "
-					 "%02x %02x %02x %02x "
-					 "%02x %02x %02x %02x "
-					 "%02x %02x %02x %02x "
-					 "%02x %02x %02x %02x\n",
-					 out[0], out[1], out[2], out[3],
-					 out[4], out[5], out[6], out[7],
-					 out[8], out[9], out[10], out[11],
-					 out[12], out[13], out[14], out[15],
-					 out[16], out[17], out[18], out[19],
-					 out[20], out[21], out[22], out[23],
-					 out[24], out[25], out[26], out[27],
-					 out[28], out[29], out[30], out[31]);
-		 }
-#endif
+         //cl_keccak_final(&(ctx->keccak), out, debug);
          break;
       case 6:
          cl_md2_final(&(ctx->md2), out);
