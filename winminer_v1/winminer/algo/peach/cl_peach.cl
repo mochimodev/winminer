@@ -127,13 +127,6 @@ typedef struct {
 } CUDA_SHA1_CTX;
 
 typedef struct {
-	BYTE data[64];
-	WORD datalen;
-	unsigned long bitlen;
-	WORD state[8];
-} CUDA_SHA256_CTX;
-
-typedef struct {
 
    uint32_t digestlen;
    uint32_t algo_type;
@@ -141,7 +134,6 @@ typedef struct {
    union {
 	   cl_blake2b_ctx_t blake2b;
 	   CUDA_SHA1_CTX sha1;
-	   CUDA_SHA256_CTX sha256;
 	   CUDA_MD2_CTX md2;
 	   CUDA_MD5_CTX md5;
    };
@@ -154,9 +146,9 @@ void cl_nighthash_init(CUDA_NIGHTHASH_CTX *ctx, uint8_t *algo_type_seed,
                                     uint8_t transform, uint8_t debug);
 void cl_nighthash_update(CUDA_NIGHTHASH_CTX *ctx, uint8_t *in, uint32_t inlen, uint8_t debug);
 void cl_nighthash_final(CUDA_NIGHTHASH_CTX *ctx, uint8_t *out, uint8_t debug);
-void cl_sha256_init(CUDA_SHA256_CTX *ctx);
-void cl_sha256_update(CUDA_SHA256_CTX *ctx, BYTE data[], size_t len);
-void cl_sha256_final(CUDA_SHA256_CTX *ctx, BYTE hash[]);
+void SHA2_256_36B(uint *Digest, const uint *InData);
+void SHA2_256_124B(uint *Digest, const uint *InData);
+void SHA2_256_1056B_1060B(uint *Digest, const uint *InData, bool Is1060);
 void cl_blake2b_init(cl_blake2b_ctx_t *ctx, BYTE* key, WORD keylen, WORD digestbitlen, uint8_t debug);
 void cl_blake2b_update(cl_blake2b_ctx_t *ctx, BYTE* in, LONG inlen);
 void cl_blake2b_final(cl_blake2b_ctx_t *ctx, BYTE* out);
@@ -234,7 +226,9 @@ uint32_t cl_next_index(uint32_t index, __global uint8_t *g_map, uint8_t *nonce, 
    /* Setup nighthash the seed, NO TRANSFORM */
    cl_nighthash_init(&nighthash, seed, seedlen, index, 0, debug);
 
-   if (nighthash.algo_type == 4) {
+   if (nighthash.algo_type == 3) {
+	   SHA2_256_1056B_1060B((uint*)hash, (uint*)seed, true);
+   } else if (nighthash.algo_type == 4) {
 	   SHA3Digest1060B((ulong*)hash, (ulong*)seed);
    } else if (nighthash.algo_type == 5) {
 	   Keccak256Digest1060B((ulong*)hash, (ulong*)seed);
@@ -279,7 +273,9 @@ void cl_gen_tile(uint32_t index, __global uint8_t *g_map, uint8_t debug, __globa
    /* Setup nighthash with a transform of the seed */
    cl_nighthash_init(&nighthash, seed, seedlen, index, 1, debug);
 
-   if (nighthash.algo_type == 4) {
+   if (nighthash.algo_type == 3) {
+	   SHA2_256_36B((uint*)local_out, (uint*)seed);
+   } else if (nighthash.algo_type == 4) {
    	SHA3256Digest36B((ulong*)local_out, (ulong*)seed);
    } else if (nighthash.algo_type == 5) {
    	Keccak256Digest36B((ulong*)local_out, (ulong*)seed);
@@ -309,7 +305,9 @@ void cl_gen_tile(uint32_t index, __global uint8_t *g_map, uint8_t debug, __globa
 		   local_out[HASHLEN+z] = ((uint8_t*)&index)[z];
 	   }
 
-	   if (nighthash.algo_type == 4) {
+	   if (nighthash.algo_type == 3) {
+		   SHA2_256_36B((uint*)local_out, (uint*)local_out);
+	   } else if (nighthash.algo_type == 4) {
 		   SHA3256Digest36B((ulong*)local_out, (ulong*)local_out);
 	   } else if (nighthash.algo_type == 5) {
 		   Keccak256Digest36B((ulong*)local_out, (ulong*)local_out);
@@ -363,7 +361,6 @@ __kernel void cl_find_peach(uint32_t threads, __global uint8_t *g_map,
    uint32_t thread = get_global_id(0);// + 122868 - 120;
    uint8_t scratch[1060]; // scratch space for cl_next_index
 
-   CUDA_SHA256_CTX ictx;
    uint8_t seed[16] = {0}, nonce[32] = {0};
    uint8_t bt_hash[32], fhash[32];
    int32_t i, j, n;
@@ -406,30 +403,14 @@ __kernel void cl_find_peach(uint32_t threads, __global uint8_t *g_map,
       /*********************************************************/
       /* Hash 124 bytes of Block Trailer, including both seeds */
 
-      cl_sha256_init(&ictx);
-      #ifdef AMD
-uint8_t l_input[108];
-for (int i = 0; i < 108; i++) {
-	l_input[i] = c_input[i];
-}
-      cl_sha256_update(&ictx, l_input, 108);
-      cl_sha256_update(&ictx, nonce+16, 16);
-      #else
-      cl_sha256_update(&ictx, c_input, 108);
-      cl_sha256_update(&ictx, seed, 16);
-      #endif
-      cl_sha256_final(&ictx, bt_hash);
-
-      /*printf("c_input: ");
-	for (int j = 0; j < 108; j++) {
-		printf("%02x ", c_input[j]);
-	}
-	printf("\n");
-      printf("bt_hash: ");
-	for (int j = 0; j < HASHLEN; j++) {
-		printf("%02x ", bt_hash[j]);
-	}
-	printf("\n");*/
+      uint8_t l_input[124];
+      for (int i = 0; i < 108; i++) {
+	      l_input[i] = c_input[i];
+      }
+      for (int i = 0; i < 16; i++) {
+	      l_input[108+i] = nonce[16+i];
+      }
+      SHA2_256_124B((uint*)bt_hash, (uint*)l_input);
 
       /****************************************************/
       /* Follow the tile path based on the selected nonce */
@@ -452,21 +433,14 @@ uint32_t sm_chain[JUMP];
       /****************************************************************/
       /* Check the hash of the final tile produces the desired result */
 
-      cl_sha256_init(&ictx);
-      cl_sha256_update(&ictx, bt_hash, HASHLEN);
-      #ifdef AMD
-      uint8_t l_hash[HASHLEN];
-      __global uint8_t *g_tile = &(g_map[sm*TILE_LENGTH]);
-      for (int i = 0; i < TILE_ROWS; i++) {
-	      for (int j = 0; j < HASHLEN; j++) {
-		      l_hash[j] = g_tile[i*HASHLEN + j];
-	      }
-	      cl_sha256_update(&ictx, l_hash, HASHLEN);
+      uint8_t btbuf[HASHLEN+TILE_LENGTH];
+      for (int i = 0; i < HASHLEN; i++) {
+	      btbuf[i] = bt_hash[i];
       }
-      #else
-      cl_sha256_update(&ictx, &g_map[sm * TILE_LENGTH], TILE_LENGTH);
-      #endif
-      cl_sha256_final(&ictx, fhash);
+      for (int i = 0; i < TILE_LENGTH; i++) {
+	      btbuf[HASHLEN+i] = g_map[sm*TILE_LENGTH + i];
+      }
+      SHA2_256_1056B_1060B((uint*)fhash, (uint*)btbuf, false);
 
       /* Evaluate hash */
       for (x = i = j = n = 0; i < HASHLEN; i++) {
@@ -853,7 +827,7 @@ void cl_nighthash_init(CUDA_NIGHTHASH_CTX *ctx, uint8_t *algo_type_seed,
          cl_sha1_init(&(ctx->sha1));
          break;
       case 3:
-         cl_sha256_init(&(ctx->sha256));
+         //cl_sha256_init(&(ctx->sha256));
          break;
       case 4:
          //cl_keccak_sha3_init(&(ctx->sha3), 256);
@@ -917,16 +891,7 @@ void cl_nighthash_update(CUDA_NIGHTHASH_CTX *ctx, uint8_t *in, uint32_t inlen, u
 #endif
          break;
       case 3:
-         cl_sha256_update(&(ctx->sha256), in, inlen);
-#ifdef DEBUG
-		 if (debug) {
-			 printf("sha256 update: ");
-			 for (int i = 0; i < inlen; i++) {
-				 printf("%02x ", in[i]);
-			 }
-			 printf("\n");
-		 }
-#endif
+         //cl_sha256_update(&(ctx->sha256), in, inlen);
          break;
       case 4:
          //cl_keccak_update(&(ctx->sha3), in, inlen, debug);
@@ -1042,28 +1007,7 @@ void cl_nighthash_final(CUDA_NIGHTHASH_CTX *ctx, uint8_t *out, uint8_t debug)
 #endif
          break;
       case 3:
-         cl_sha256_final(&(ctx->sha256), out);
-#ifdef DEBUG
-		 if (debug) {
-			 printf("sha256 final: "
-					 "%02x %02x %02x %02x "
-					 "%02x %02x %02x %02x "
-					 "%02x %02x %02x %02x "
-					 "%02x %02x %02x %02x "
-					 "%02x %02x %02x %02x "
-					 "%02x %02x %02x %02x "
-					 "%02x %02x %02x %02x "
-					 "%02x %02x %02x %02x\n",
-					 out[0], out[1], out[2], out[3],
-					 out[4], out[5], out[6], out[7],
-					 out[8], out[9], out[10], out[11],
-					 out[12], out[13], out[14], out[15],
-					 out[16], out[17], out[18], out[19],
-					 out[20], out[21], out[22], out[23],
-					 out[24], out[25], out[26], out[27],
-					 out[28], out[29], out[30], out[31]);
-		 }
-#endif
+         //cl_sha256_final(&(ctx->sha256), out);
          break;
       case 4:
          //cl_keccak_final(&(ctx->sha3), out, debug);

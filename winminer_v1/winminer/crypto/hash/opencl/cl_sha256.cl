@@ -1,194 +1,192 @@
-/*
- * sha256.cu Implementation of SHA256 Hashing    
- *
- * Copyright (c) 2019 by Adequate Systems, LLC.  All Rights Reserved.
- * See LICENSE.PDF   **** NO WARRANTY ****
- *
- * Date: 12 June 2019
- * Revision: 1
- *
- * This file is subject to the license as found in LICENSE.PDF
- *
- * Based on the public domain Reference Implementation in C, by
- * Brad Conte, original code here:
- *
- * https://github.com/B-Con/crypto-algorithms
- *
- */
+// SHA2-256 hash implementations Copyright (c) 2019 Wolf9466 (AKA Wolf0/OhGodAPet)
 
-typedef uchar uint8_t;
-typedef int int32_t;
-typedef uint uint32_t;
-typedef long int64_t;
-typedef ulong uint64_t;
-#define __forceinline__ inline
-typedef uchar BYTE;             // 8-bit byte
-typedef uint  WORD;             // 32-bit word, change to "long" for 16-bit machines
-typedef ulong LONG;
-
-typedef struct {
-	BYTE data[64];
-	WORD datalen;
-	unsigned long bitlen;
-	WORD state[8];
-} CUDA_SHA256_CTX;
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions are met:
+// 1. Redistributions of source code must retain the above copyright
+//    notice, this list of conditions and the following disclaimer.
+// 2. Redistributions in binary form must reproduce the above copyright
+//    notice, this list of conditions and the following disclaimer in the
+//    documentation and/or other materials provided with the distribution.
+// 3. All advertising materials mentioning features or use of this software
+//    must display the following acknowledgement:
+//    This product includes software developed by Wolf9466.
+// 4. Neither the name of the <organization> nor the
+//    names of its contributors may be used to endorse or promote products
+//    derived from this software without specific prior written permission.
+//
+// THIS SOFTWARE IS PROVIDED BY <COPYRIGHT HOLDER> ''AS IS'' AND ANY
+// EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+// WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+// DISCLAIMED. IN NO EVENT SHALL <COPYRIGHT HOLDER> BE LIABLE FOR ANY
+// DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+// (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+// LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+// ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+// SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
-/*************************** HEADER FILES ***************************/
-#if 0
-#include <stdlib.h>
-#include <memory.h>
-extern "C" {
-#include "sha256.cuh"
-}
-#endif
-/****************************** MACROS ******************************/
-#define SHA256_BLOCK_SIZE 32            // SHA256 outputs a 32 byte digest
-
-/**************************** DATA TYPES ****************************/
-
-/****************************** MACROS ******************************/
-#ifndef ROTLEFT
-#define ROTLEFT(a,b) (((a) << (b)) | ((a) >> (32-(b))))
-#endif
-
-#define ROTRIGHT(a,b) (((a) >> (b)) | ((a) << (32-(b))))
-
-#define CH(x,y,z) (((x) & (y)) ^ (~(x) & (z)))
-#define MAJ(x,y,z) (((x) & (y)) ^ ((x) & (z)) ^ ((y) & (z)))
-#define EP0(x) (ROTRIGHT(x,2) ^ ROTRIGHT(x,13) ^ ROTRIGHT(x,22))
-#define EP1(x) (ROTRIGHT(x,6) ^ ROTRIGHT(x,11) ^ ROTRIGHT(x,25))
-#define SIG0(x) (ROTRIGHT(x,7) ^ ROTRIGHT(x,18) ^ ((x) >> 3))
-#define SIG1(x) (ROTRIGHT(x,17) ^ ROTRIGHT(x,19) ^ ((x) >> 10))
-
-/**************************** VARIABLES *****************************/
-__constant WORD k[64] = {
-	0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,
-	0xd807aa98,0x12835b01,0x243185be,0x550c7dc3,0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174,
-	0xe49b69c1,0xefbe4786,0x0fc19dc6,0x240ca1cc,0x2de92c6f,0x4a7484aa,0x5cb0a9dc,0x76f988da,
-	0x983e5152,0xa831c66d,0xb00327c8,0xbf597fc7,0xc6e00bf3,0xd5a79147,0x06ca6351,0x14292967,
-	0x27b70a85,0x2e1b2138,0x4d2c6dfc,0x53380d13,0x650a7354,0x766a0abb,0x81c2c92e,0x92722c85,
-	0xa2bfe8a1,0xa81a664b,0xc24b8b70,0xc76c51a3,0xd192e819,0xd6990624,0xf40e3585,0x106aa070,
-	0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,
-	0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2
+static const __constant uint SHA2_256_K[64] =
+{
+	0x428A2F98, 0x71374491, 0xB5C0FBCF, 0xE9B5DBA5, 0x3956C25B, 0x59F111F1, 0x923F82A4, 0xAB1C5ED5,
+	0xD807AA98, 0x12835B01, 0x243185BE, 0x550C7DC3, 0x72BE5D74, 0x80DEB1FE, 0x9BDC06A7, 0xC19BF174,
+	0xE49B69C1, 0xEFBE4786, 0x0FC19DC6, 0x240CA1CC, 0x2DE92C6F, 0x4A7484AA, 0x5CB0A9DC, 0x76F988DA,
+	0x983E5152, 0xA831C66D, 0xB00327C8, 0xBF597FC7, 0xC6E00BF3, 0xD5A79147, 0x06CA6351, 0x14292967,
+	0x27B70A85, 0x2E1B2138, 0x4D2C6DFC, 0x53380D13, 0x650A7354, 0x766A0ABB, 0x81C2C92E, 0x92722C85,
+	0xA2BFE8A1, 0xA81A664B, 0xC24B8B70, 0xC76C51A3, 0xD192E819, 0xD6990624, 0xF40E3585, 0x106AA070,
+	0x19A4C116, 0x1E376C08, 0x2748774C, 0x34B0BCB5, 0x391C0CB3, 0x4ED8AA4A, 0x5B9CCA4F, 0x682E6FF3,
+	0x748F82EE, 0x78A5636F, 0x84C87814, 0x8CC70208, 0x90BEFFFA, 0xA4506CEB, 0xBEF9A3F7, 0xC67178F2
 };
 
-/*********************** FUNCTION DEFINITIONS ***********************/
- __forceinline__ void cl_sha256_transform(CUDA_SHA256_CTX *ctx, /*const*/BYTE data[])
+static const __constant uint SHA2_256_IV[8] =
 {
-	WORD a, b, c, d, e, f, g, h, i, j, t1, t2, m[64];
+	0x6A09E667, 0xBB67AE85, 0x3C6EF372, 0xA54FF53A,
+	0x510E527F, 0x9B05688C, 0x1F83D9AB, 0x5BE0CD19
+};
 
-	for (i = 0, j = 0; i < 16; ++i, j += 4)
-		m[i] = (data[j] << 24) | (data[j + 1] << 16) | (data[j + 2] << 8) | (data[j + 3]);
-	for ( ; i < 64; ++i)
-		m[i] = SIG1(m[i - 2]) + m[i - 7] + SIG0(m[i - 15]) + m[i - 16];
+#define BSWAP32(x)			(as_uint(as_uchar4(x).s3210))
+#define BSWAP64(x)			(as_ulong(as_uchar8(x).s76543210))
+#define bitselect(a, b, c)	((a) ^ ((c) & ((b) ^ (a))))
+#define rotate(x, y)		(((x) << (y)) | ((x) >> (32 - (y))))
+#define CH(X, Y, Z)			bitselect(Z, Y, X)
+#define MAJ(X, Y, Z)		CH((X ^ Z), Y, Z)
 
-	a = ctx->state[0];
-	b = ctx->state[1];
-	c = ctx->state[2];
-	d = ctx->state[3];
-	e = ctx->state[4];
-	f = ctx->state[5];
-	g = ctx->state[6];
-	h = ctx->state[7];
+#define F0(x)				(rotate((x), 30U) ^ rotate((x), 19U) ^ rotate((x), 10U))
+#define F1(x)				(rotate((x), 26U) ^ rotate((x), 21U) ^ rotate((x), 7U))
+#define S0(x)				(rotate((x), 25U) ^ rotate((x), 14U) ^ ((x) >> 3))
+#define S1(x)				(rotate((x), 15U) ^ rotate((x), 13U) ^ ((x) >> 10))
 
-	for (i = 0; i < 64; ++i) {
-		t1 = h + EP1(e) + CH(e,f,g) + k[i] + m[i];
-		t2 = EP0(a) + MAJ(a,b,c);
-		h = g;
-		g = f;
-		f = e;
-		e = d + t1;
-		d = c;
-		c = b;
-		b = a;
-		a = t1 + t2;
-	}
-
-	ctx->state[0] += a;
-	ctx->state[1] += b;
-	ctx->state[2] += c;
-	ctx->state[3] += d;
-	ctx->state[4] += e;
-	ctx->state[5] += f;
-	ctx->state[6] += g;
-	ctx->state[7] += h;
+#define SHA2_256_STEP(A, B, C, D, E, F, G, H, idx0, idx1) { \
+	uint tmp = H + F1(E) + CH(E, F, G) + SHA2_256_K[idx0] + W[idx1]; \
+	D += tmp; \
+	H = tmp + F0(A) + MAJ(A, B, C); \
 }
 
-void cl_sha256_init(CUDA_SHA256_CTX *ctx)
+void SHA2_256_Transform(uint *InState, uint *Input)
 {
-	ctx->datalen = 0;
-	ctx->bitlen = 0;
-	ctx->state[0] = 0x6a09e667;
-	ctx->state[1] = 0xbb67ae85;
-	ctx->state[2] = 0x3c6ef372;
-	ctx->state[3] = 0xa54ff53a;
-	ctx->state[4] = 0x510e527f;
-	ctx->state[5] = 0x9b05688c;
-	ctx->state[6] = 0x1f83d9ab;
-	ctx->state[7] = 0x5be0cd19;
-}
+	uint W[32], State[8];
 
-void cl_sha256_update(CUDA_SHA256_CTX *ctx, /*const*/BYTE data[], size_t len)
-{
-	WORD i;
+	#pragma unroll
+	for(int i = 0; i < 8; ++i) State[i] = InState[i];
 
-	for (i = 0; i < len; ++i) {
-		ctx->data[ctx->datalen] = data[i];
-		ctx->datalen++;
-		if (ctx->datalen == 64) {
-			cl_sha256_transform(ctx, ctx->data);
-			ctx->bitlen += 512;
-			ctx->datalen = 0;
+	#pragma unroll
+	for(int i = 0; i < 16; ++i) W[i] = BSWAP32(Input[i]);
+
+	for(int i = 0; i < 64; i += 16)
+	{
+		#pragma unroll
+		for(int x = 0; x < 16; x += 8)
+		{
+			SHA2_256_STEP(State[0], State[1], State[2], State[3], State[4], State[5], State[6], State[7], i + x, x);
+			SHA2_256_STEP(State[7], State[0], State[1], State[2], State[3], State[4], State[5], State[6], i + x + 1, x + 1);
+			SHA2_256_STEP(State[6], State[7], State[0], State[1], State[2], State[3], State[4], State[5], i + x + 2, x + 2);
+			SHA2_256_STEP(State[5], State[6], State[7], State[0], State[1], State[2], State[3], State[4], i + x + 3, x + 3);
+			SHA2_256_STEP(State[4], State[5], State[6], State[7], State[0], State[1], State[2], State[3], i + x + 4, x + 4);
+			SHA2_256_STEP(State[3], State[4], State[5], State[6], State[7], State[0], State[1], State[2], i + x + 5, x + 5);
+			SHA2_256_STEP(State[2], State[3], State[4], State[5], State[6], State[7], State[0], State[1], i + x + 6, x + 6);
+			SHA2_256_STEP(State[1], State[2], State[3], State[4], State[5], State[6], State[7], State[0], i + x + 7, x + 7);
 		}
+
+		#pragma unroll
+		for(int x = 16; x < 32; ++x)
+			W[x - 16] = S1(W[(x - 2) & 15]) + W[(x - 7) & 15] + S0(W[(x - 15) & 15]) + W[x - 16];
 	}
+
+	#pragma unroll
+	for(int i = 0; i < 8; ++i) InState[i] += State[i];
 }
 
-void cl_sha256_final(CUDA_SHA256_CTX *ctx, BYTE hash[])
+void SHA2_256_36B(uint *Digest, const uint *InData)
 {
-	WORD i;
+	uint State[8], Data[16];
 
-	i = ctx->datalen;
+	#pragma unroll
+	for(int i = 0; i < 8; ++i) State[i] = SHA2_256_IV[i];
 
-	// Pad whatever data is left in the buffer.
-	if (ctx->datalen < 56) {
-		ctx->data[i++] = 0x80;
-		while (i < 56)
-			ctx->data[i++] = 0x00;
+	#pragma unroll
+	for(int i = 0; i < 9; ++i) Data[i] = InData[i];
+
+	// Pad this shit, Merkle–Damgård style, except...
+	// Do NOT endian-swap the padding! The transform
+	// is expecting all little-endian input!
+	Data[9] = 0x80UL;
+
+	#pragma unroll
+	for(int i = 10; i < 16; ++i) Data[i] = 0UL;
+
+	((ulong *)Data)[7] = BSWAP64(36UL << 3);
+
+	SHA2_256_Transform(State, Data);
+
+	// Endian-swap the result
+	#pragma unroll
+	for(int i = 0; i < 8; ++i) Digest[i] = BSWAP32(State[i]);
+}
+
+void SHA2_256_124B(uint *Digest, const uint *InData)
+{
+	uint State[8], Data[16];
+
+	#pragma unroll
+	for(int i = 0; i < 8; ++i) State[i] = SHA2_256_IV[i];
+
+	#pragma unroll
+	for(int i = 0; i < 16; ++i) Data[i] = InData[i];
+
+	SHA2_256_Transform(State, Data);
+
+	#pragma unroll
+	for(int i = 0; i < 15; ++i) Data[i] = InData[16 + i];
+
+	Data[15] = 0x80UL;
+
+	SHA2_256_Transform(State, Data);
+
+	#pragma unroll
+	for(int i = 0; i < 14; ++i) Data[i] = 0UL;
+
+	((ulong *)Data)[7] = BSWAP64(124UL << 3);
+
+	SHA2_256_Transform(State, Data);
+
+	// Endian-swap the result
+	#pragma unroll
+	for(int i = 0; i < 8; ++i) Digest[i] = BSWAP32(State[i]);
+}
+
+void SHA2_256_1056B_1060B(uint *Digest, const uint *InData, bool Is1060)
+{
+	uint State[8], Data[16];
+
+	#pragma unroll
+	for(int i = 0; i < 8; ++i) State[i] = SHA2_256_IV[i];
+
+	for(int i = 0; i < 16; ++i)
+	{
+		#pragma unroll
+		for(int x = 0; x < 16; ++x) Data[x] = InData[(i << 4) + x];
+
+		SHA2_256_Transform(State, Data);
 	}
-	else {
-		ctx->data[i++] = 0x80;
-		while (i < 64)
-			ctx->data[i++] = 0x00;
-		cl_sha256_transform(ctx, ctx->data);
-		//memset(ctx->data, 0, 56);
-	   for (int i = 0; i < 56; i++) {
-		   ((uint8_t*)(ctx->data))[i] = 0;
-	   }
-	}
 
-	// Append to the padding the total message's length in bits and transform.
-	ctx->bitlen += ctx->datalen * 8;
-	ctx->data[63] = ctx->bitlen;
-	ctx->data[62] = ctx->bitlen >> 8;
-	ctx->data[61] = ctx->bitlen >> 16;
-	ctx->data[60] = ctx->bitlen >> 24;
-	ctx->data[59] = ctx->bitlen >> 32;
-	ctx->data[58] = ctx->bitlen >> 40;
-	ctx->data[57] = ctx->bitlen >> 48;
-	ctx->data[56] = ctx->bitlen >> 56;
-	cl_sha256_transform(ctx, ctx->data);
+	#pragma unroll
+	for(int i = 0; i < 8; ++i) Data[i] = InData[256 + i];
 
-	// Since this implementation uses little endian byte ordering and SHA uses big endian,
-	// reverse all the bytes when copying the final state to the output hash.
-	for (i = 0; i < 4; ++i) {
-		hash[i]      = (ctx->state[0] >> (24 - i * 8)) & 0x000000ff;
-		hash[i + 4]  = (ctx->state[1] >> (24 - i * 8)) & 0x000000ff;
-		hash[i + 8]  = (ctx->state[2] >> (24 - i * 8)) & 0x000000ff;
-		hash[i + 12] = (ctx->state[3] >> (24 - i * 8)) & 0x000000ff;
-		hash[i + 16] = (ctx->state[4] >> (24 - i * 8)) & 0x000000ff;
-		hash[i + 20] = (ctx->state[5] >> (24 - i * 8)) & 0x000000ff;
-		hash[i + 24] = (ctx->state[6] >> (24 - i * 8)) & 0x000000ff;
-		hash[i + 28] = (ctx->state[7] >> (24 - i * 8)) & 0x000000ff;
-	}
+	// Merkle–Damgård style padding here, except...
+	// Do NOT endian-swap the padding! The transform
+	// is expecting all little-endian input!
+
+	// Handle the case of 1060 byte input
+	Data[8] = (Is1060) ? InData[264] : 0x80U;
+	Data[9] = (Is1060) ? 0x80U : 0x00U;
+
+	for(int i = 10; i < 14; ++i) Data[i] = 0UL;
+
+	((ulong *)Data)[7] = (Is1060) ? 0x2021000000000000UL : 0x0021000000000000UL;
+
+	SHA2_256_Transform(State, Data);
+
+	// Endian-swap the result
+	#pragma unroll
+	for(int i = 0; i < 8; ++i) Digest[i] = BSWAP32(State[i]);
 }
