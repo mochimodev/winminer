@@ -10,24 +10,6 @@
 
 #pragma OPENCL EXTENSION cl_khr_byte_addressable_store : enable
 
-#if 0
-#include <stdio.h>
-#include <stdint.h>
-#include <inttypes.h>
-#include <cl_runtime.h>
-#include <time.h>
-
-#include "../../sleep.h"
-#include "../../config.h"
-
-#include "../../types.h"
-
-#include "peach.h"
-#include "nighthash.cu"
-#include "../../helpers.h"
-#include "cl_peach.h"
-#endif
-
 #define AMD
 
 #define __CL_ENABLE_EXCEPTIONS
@@ -133,9 +115,6 @@ void cl_md5_init(CUDA_MD5_CTX *ctx);
 void cl_md5_update(CUDA_MD5_CTX *ctx, BYTE data[], size_t len);
 void cl_md5_final(CUDA_MD5_CTX *ctx, BYTE hash[]);
 
-/*__constant static uint8_t __align__(8) c_phash[32];
-__constant static uint8_t __align__(8) c_input[108];
-__constant static uint8_t __align__(8) c_difficulty;*/
 __constant static int Z_MASS[4] = {238,239,240,242};
 __constant static int Z_ING[2]  = {42,43};
 __constant static int Z_TIME[16] =
@@ -159,15 +138,12 @@ uint32_t cl_next_index(uint32_t index, __global uint8_t *g_map, uint8_t *nonce, 
    int i = 0;
 
    /* Create nighthash seed for this index on the map */
-   //memcpy(seed, nonce, HASHLEN);
     for (int i = 0; i < HASHLEN; i++) {
 	    ((uint8_t*)seed)[i] = nonce[i];
     }
-   //memcpy(seed + HASHLEN, (uint8_t *) &index, 4);
     for (int i = 0; i < 4; i++) {
 	    ((uint8_t*)(seed+HASHLEN))[i] = ((uint8_t*)&index)[i];
     }
-   //memcpy(seed + HASHLEN + 4, &g_map[index * TILE_LENGTH], TILE_LENGTH);
     for (int i = 0; i < TILE_LENGTH; i++) {
 	    ((uint8_t*)(seed+HASHLEN+4))[i] = g_map[index*TILE_LENGTH + i];
     }
@@ -241,7 +217,6 @@ void cl_gen_tile(uint32_t index, __global uint8_t *g_map, uint8_t debug, __globa
     for (int i = 0; i < 4; i++) {
 	    seed[i] = ((uint8_t*)&index)[i];
     }
-   //memcpy(seed + 4, c_phash, HASHLEN);
     for (int i = 0; i < HASHLEN; i++) {
 	    (seed+4)[i] = ((__global uint8_t*)c_phash)[i];
     }
@@ -308,12 +283,6 @@ void cl_gen_tile(uint32_t index, __global uint8_t *g_map, uint8_t debug, __globa
 	   } else {
 		   /* Update nighthash with the seed data and tile index */
 		   cl_nighthash_update(&nighthash, local_out, HASHLEN+4, debug);
-		   //cl_nighthash_update(&nighthash, (uint8_t *) &index, 4, debug);
-
-		   /* Finalize nighthash into the first 32 byte chunk of the tile */
-		   /*if (debug) {
-			   printf("tilep[%d] = %02x\n", i, local_out[0]);
-		   }*/
 		   cl_nighthash_final(&nighthash, local_out, debug);
 	   }
 	   for (int z = 0; z < HASHLEN; z++) {
@@ -513,17 +482,6 @@ if (n>=c_difficulty) {
  * This file is subject to the license as found in LICENSE.PDF
  *
  */
-
-#if 0
-#include "../../crypto/hash/cuda/blake2b.cu"
-#include "../../crypto/hash/cuda/keccak.cu"
-#include "../../crypto/hash/cuda/sha256.cu"
-#include "../../crypto/hash/cuda/sha1.cu"
-#include "../../crypto/hash/cuda/md5.cu"
-#include "../../crypto/hash/cuda/md2.cu"
-#include "../../types.h"
-#include "peach.h"
-#endif
 
 /**
  * Performs data transformation on 32 bit chunks (4 bytes) of data
@@ -805,7 +763,6 @@ void cl_nighthash_init(CUDA_NIGHTHASH_CTX *ctx, uint8_t *algo_type_seed,
 #endif
    
    /* Clear nighthash context */
-   //memset(ctx, 0, sizeof(CUDA_NIGHTHASH_CTX));
    for (int i = 0; i < sizeof(CUDA_NIGHTHASH_CTX); i++) {
 	   ((uint8_t*)ctx)[i] = 0;
    }
@@ -821,61 +778,14 @@ void cl_nighthash_init(CUDA_NIGHTHASH_CTX *ctx, uint8_t *algo_type_seed,
 
    switch(ctx->algo_type)
    {
-      case 0:
-#if 0
-         //memset(key32, ctx->algo_type, 32);
-	   for (int i = 0; i < 32; i++) {
-		   ((uint8_t*)key32)[i] = ctx->algo_type;
-	   }
-#ifdef DEBUG
-	   if (debug) {
-		   printf("blake2b_init, key32: ");
-		   for (int i = 0; i < 32; i++) {
-			   printf("%02x ", key32[i]);
-		   }
-		   printf("\n");
-	   }
-#endif
-         cl_blake2b_init(&(ctx->blake2b), key32, 32, 256, debug);
-#endif
-         break;
-      case 1:
-#if 0
-         //memset(key64, ctx->algo_type, 64);
-	   for (int i = 0; i < 64; i++) {
-		   ((uint8_t*)key64)[i] = ctx->algo_type;
-	   }
-#ifdef DEBUG
-	   if (debug) {
-		   printf32("blake2b_init, key64: ", key64);
-		   /*printf("blake2b_init, key64: ");
-		   for (int i = 0; i < 64; i++) {
-			   printf("%02x ", key64[i]);
-		   }
-		   printf("\n");*/
-	   }
-#endif
-         cl_blake2b_init(&(ctx->blake2b), key64, 64, 256, debug);
-#endif
-         break;
-      case 2:
-         //cl_sha1_init(&(ctx->sha1));
-         break;
-      case 3:
-         //cl_sha256_init(&(ctx->sha256));
-         break;
-      case 4:
-         //cl_keccak_sha3_init(&(ctx->sha3), 256);
-         break;
-      case 5:
-         //cl_keccak_init(&(ctx->keccak), 256);
-         break;
       case 6:
          cl_md2_init(&(ctx->md2));
          break;
       case 7:
          cl_md5_init(&(ctx->md5));
          break;
+      default:
+	 break;
    } /* end switch(algo_type)... */
 }
 
@@ -883,63 +793,6 @@ void cl_nighthash_update(CUDA_NIGHTHASH_CTX *ctx, uint8_t *in, uint32_t inlen, u
 {
    switch(ctx->algo_type)
    {
-      case 0:
-#if 0
-         cl_blake2b_update(&(ctx->blake2b), in, inlen);
-#ifdef DEBUG
-		 if (debug) {
-			 printf("blake2b(0) update: inlen: %d, in: ", inlen);
-			 for (int i = 0; i < inlen; i++) {
-				 printf("%02x ", in[i]);
-			 }
-			 printf("\n");
-		 }
-#endif
-#endif
-         break;
-      case 1:
-#if 0
-         cl_blake2b_update(&(ctx->blake2b), in, inlen);
-#ifdef DEBUG
-		 if (debug) {
-			 if (inlen >= 32) {
-				 printf32("blake2b(1) update: ", in);
-			 } else if (inlen >= 16) {
-				 printf16("blake2b(1) update: ", in);
-			 } else {
-				 printf("blake2b(1) update: ");
-				 for (int i = 0; i < inlen; i++) {
-					 printf("%02x ", in[i]);
-				 }
-				 printf("\n");
-			 }
-		 }
-#endif
-#endif
-         break;
-      case 2:
-#if 0
-         cl_sha1_update(&(ctx->sha1), in, inlen);
-#ifdef DEBUG
-		 if (debug) {
-			 printf("sha1 update: ");
-			 for (int i = 0; i < inlen; i++) {
-				 printf("%02x ", in[i]);
-			 }
-			 printf("\n");
-		 }
-#endif
-#endif
-         break;
-      case 3:
-         //cl_sha256_update(&(ctx->sha256), in, inlen);
-         break;
-      case 4:
-         //cl_keccak_update(&(ctx->sha3), in, inlen, debug);
-         break;
-      case 5:
-         //cl_keccak_update(&(ctx->keccak), in, inlen, debug);
-         break;
       case 6:
          cl_md2_update(&(ctx->md2), in, inlen);
 #ifdef DEBUG
@@ -964,6 +817,8 @@ void cl_nighthash_update(CUDA_NIGHTHASH_CTX *ctx, uint8_t *in, uint32_t inlen, u
 		 }
 #endif
          break;
+      default:
+	 break;
    } /* end switch(ctx->... */
 }
 
@@ -971,107 +826,14 @@ void cl_nighthash_final(CUDA_NIGHTHASH_CTX *ctx, uint8_t *out, uint8_t debug)
 {
    switch(ctx->algo_type)
    {
-      case 0:
-#if 0
-         cl_blake2b_final(&(ctx->blake2b), out);
-#ifdef DEBUG
-		 if (debug) {
-			 printf("blake2b(0) final: "
-					 "%02x %02x %02x %02x "
-					 "%02x %02x %02x %02x "
-					 "%02x %02x %02x %02x "
-					 "%02x %02x %02x %02x "
-					 "%02x %02x %02x %02x "
-					 "%02x %02x %02x %02x "
-					 "%02x %02x %02x %02x "
-					 "%02x %02x %02x %02x\n",
-					 out[0], out[1], out[2], out[3],
-					 out[4], out[5], out[6], out[7],
-					 out[8], out[9], out[10], out[11],
-					 out[12], out[13], out[14], out[15],
-					 out[16], out[17], out[18], out[19],
-					 out[20], out[21], out[22], out[23],
-					 out[24], out[25], out[26], out[27],
-					 out[28], out[29], out[30], out[31]);
-		 }
-#endif
-#endif
-         break;
-      case 1:
-#if 0
-         cl_blake2b_final(&(ctx->blake2b), out);
-#ifdef DEBUG
-		 if (debug) {
-			 printf("blake2b(1) final: "
-					 "%02x %02x %02x %02x "
-					 "%02x %02x %02x %02x "
-					 "%02x %02x %02x %02x "
-					 "%02x %02x %02x %02x "
-					 "%02x %02x %02x %02x "
-					 "%02x %02x %02x %02x "
-					 "%02x %02x %02x %02x "
-					 "%02x %02x %02x %02x\n",
-					 out[0], out[1], out[2], out[3],
-					 out[4], out[5], out[6], out[7],
-					 out[8], out[9], out[10], out[11],
-					 out[12], out[13], out[14], out[15],
-					 out[16], out[17], out[18], out[19],
-					 out[20], out[21], out[22], out[23],
-					 out[24], out[25], out[26], out[27],
-					 out[28], out[29], out[30], out[31]);
-		 }
-#endif
-#endif
-         break;
-      case 2:
-#if 0
-         cl_sha1_final(&(ctx->sha1), out);
-         //memset(out + 20, 0, 12);
-	   for (int i = 0; i < 12; i++) {
-		   ((uint8_t*)(out+20))[i] = 0;
-	   }
-#ifdef DEBUG
-		 if (debug) {
-			 printf("sha1 final: "
-					 "%02x %02x %02x %02x "
-					 "%02x %02x %02x %02x "
-					 "%02x %02x %02x %02x "
-					 "%02x %02x %02x %02x "
-					 "%02x %02x %02x %02x "
-					 "%02x %02x %02x %02x "
-					 "%02x %02x %02x %02x "
-					 "%02x %02x %02x %02x\n",
-					 out[0], out[1], out[2], out[3],
-					 out[4], out[5], out[6], out[7],
-					 out[8], out[9], out[10], out[11],
-					 out[12], out[13], out[14], out[15],
-					 out[16], out[17], out[18], out[19],
-					 out[20], out[21], out[22], out[23],
-					 out[24], out[25], out[26], out[27],
-					 out[28], out[29], out[30], out[31]);
-		 }
-#endif
-#endif
-         break;
-      case 3:
-         //cl_sha256_final(&(ctx->sha256), out);
-         break;
-      case 4:
-         //cl_keccak_final(&(ctx->sha3), out, debug);
-         break;
-      case 5:
-         //cl_keccak_final(&(ctx->keccak), out, debug);
-         break;
       case 6:
          cl_md2_final(&(ctx->md2), out);
-         //memset(out + 16, 0, 16);
 	   for (int i = 0; i < 16; i++) {
 		   ((uint8_t*)(out+16))[i] = 0;
 	   }
          break;
       case 7:
          cl_md5_final(&(ctx->md5), out);
-         //memset(out + 16, 0, 16);
 	   for (int i = 0; i < 16; i++) {
 		   ((uint8_t*)(out+16))[i] = 0;
 	   }
