@@ -95,29 +95,6 @@ typedef struct {
 	int len;
 } CUDA_MD2_CTX;
 
-#define BLAKE2B_ROUNDS 12
-#define BLAKE2B_BLOCK_LENGTH 128
-#define BLAKE2B_CHAIN_SIZE 8
-#define BLAKE2B_CHAIN_LENGTH (BLAKE2B_CHAIN_SIZE * sizeof(int64_t))
-#define BLAKE2B_STATE_SIZE 16
-#define BLAKE2B_STATE_LENGTH (BLAKE2B_STATE_SIZE * sizeof(int64_t))
-typedef struct {
-
-    WORD digestlen;
-    BYTE key[64];
-    WORD keylen;
-
-    BYTE buff[BLAKE2B_BLOCK_LENGTH];
-    uint64_t chain[BLAKE2B_CHAIN_SIZE];
-    uint64_t state[BLAKE2B_STATE_SIZE];
-
-    WORD pos;
-    LONG t0;
-    LONG t1;
-    LONG f0;
-
-} cl_blake2b_ctx_t;
-
 typedef struct {
 	BYTE data[64];
 	WORD datalen;
@@ -132,7 +109,6 @@ typedef struct {
    uint32_t algo_type;
 
    union {
-	   cl_blake2b_ctx_t blake2b;
 	   CUDA_SHA1_CTX sha1;
 	   CUDA_MD2_CTX md2;
 	   CUDA_MD5_CTX md5;
@@ -149,9 +125,10 @@ void cl_nighthash_final(CUDA_NIGHTHASH_CTX *ctx, uint8_t *out, uint8_t debug);
 void SHA2_256_36B(uint *Digest, const uint *InData);
 void SHA2_256_124B(uint *Digest, const uint *InData);
 void SHA2_256_1056B_1060B(uint *Digest, const uint *InData, bool Is1060);
-void cl_blake2b_init(cl_blake2b_ctx_t *ctx, BYTE* key, WORD keylen, WORD digestbitlen, uint8_t debug);
-void cl_blake2b_update(cl_blake2b_ctx_t *ctx, BYTE* in, LONG inlen);
-void cl_blake2b_final(cl_blake2b_ctx_t *ctx, BYTE* out);
+void Blake2B_K32_36B(uchar *out, uchar *in);
+void Blake2B_K64_36B(uchar *out, uchar *in);
+void Blake2B_K32_1060B(uchar *out, uchar *in);
+void Blake2B_K64_1060B(uchar *out, uchar *in);
 void cl_sha1_init(CUDA_SHA1_CTX *ctx);
 void cl_sha1_update(CUDA_SHA1_CTX *ctx, BYTE data[], size_t len);
 void cl_sha1_final(CUDA_SHA1_CTX *ctx, BYTE hash[]);
@@ -226,7 +203,11 @@ uint32_t cl_next_index(uint32_t index, __global uint8_t *g_map, uint8_t *nonce, 
    /* Setup nighthash the seed, NO TRANSFORM */
    cl_nighthash_init(&nighthash, seed, seedlen, index, 0, debug);
 
-   if (nighthash.algo_type == 3) {
+   if (nighthash.algo_type == 0) {
+	   Blake2B_K32_1060B((uchar*)hash, (uchar*)seed);
+   } else if (nighthash.algo_type == 1) {
+	   Blake2B_K64_1060B((uchar*)hash, (uchar*)seed);
+   } else if (nighthash.algo_type == 3) {
 	   SHA2_256_1056B_1060B((uint*)hash, (uint*)seed, true);
    } else if (nighthash.algo_type == 4) {
 	   SHA3Digest1060B((ulong*)hash, (ulong*)seed);
@@ -273,7 +254,11 @@ void cl_gen_tile(uint32_t index, __global uint8_t *g_map, uint8_t debug, __globa
    /* Setup nighthash with a transform of the seed */
    cl_nighthash_init(&nighthash, seed, seedlen, index, 1, debug);
 
-   if (nighthash.algo_type == 3) {
+   if (nighthash.algo_type == 0) {
+	   Blake2B_K32_36B((uchar*)local_out, (uchar*)seed);
+   } else if (nighthash.algo_type == 1) {
+	   Blake2B_K64_36B((uchar*)local_out, (uchar*)seed);
+   } else if (nighthash.algo_type == 3) {
 	   SHA2_256_36B((uint*)local_out, (uint*)seed);
    } else if (nighthash.algo_type == 4) {
    	SHA3256Digest36B((ulong*)local_out, (ulong*)seed);
@@ -305,7 +290,11 @@ void cl_gen_tile(uint32_t index, __global uint8_t *g_map, uint8_t debug, __globa
 		   local_out[HASHLEN+z] = ((uint8_t*)&index)[z];
 	   }
 
-	   if (nighthash.algo_type == 3) {
+	   if (nighthash.algo_type == 0) {
+		   Blake2B_K32_36B((uchar*)local_out, (uchar*)local_out);
+	   } else if (nighthash.algo_type == 1) {
+		   Blake2B_K64_36B((uchar*)local_out, (uchar*)local_out);
+	   } else if (nighthash.algo_type == 3) {
 		   SHA2_256_36B((uint*)local_out, (uint*)local_out);
 	   } else if (nighthash.algo_type == 4) {
 		   SHA3256Digest36B((ulong*)local_out, (ulong*)local_out);
@@ -342,7 +331,7 @@ __kernel void cl_build_map(__global uint8_t *g_map, __global uint8_t *c_phash, u
    // but the map will become wrong without this.
    if (thread == 1024*1024+1) {
 	   CUDA_NIGHTHASH_CTX ctx;
-	   printf("%p\n", &(ctx.blake2b));
+	   printf("%p\n", &(ctx.md5));
    }
 
 /*   if (thread == 0) {
@@ -791,6 +780,7 @@ void cl_nighthash_init(CUDA_NIGHTHASH_CTX *ctx, uint8_t *algo_type_seed,
    switch(ctx->algo_type)
    {
       case 0:
+#if 0
          //memset(key32, ctx->algo_type, 32);
 	   for (int i = 0; i < 32; i++) {
 		   ((uint8_t*)key32)[i] = ctx->algo_type;
@@ -805,8 +795,10 @@ void cl_nighthash_init(CUDA_NIGHTHASH_CTX *ctx, uint8_t *algo_type_seed,
 	   }
 #endif
          cl_blake2b_init(&(ctx->blake2b), key32, 32, 256, debug);
+#endif
          break;
       case 1:
+#if 0
          //memset(key64, ctx->algo_type, 64);
 	   for (int i = 0; i < 64; i++) {
 		   ((uint8_t*)key64)[i] = ctx->algo_type;
@@ -822,6 +814,7 @@ void cl_nighthash_init(CUDA_NIGHTHASH_CTX *ctx, uint8_t *algo_type_seed,
 	   }
 #endif
          cl_blake2b_init(&(ctx->blake2b), key64, 64, 256, debug);
+#endif
          break;
       case 2:
          cl_sha1_init(&(ctx->sha1));
@@ -849,6 +842,7 @@ void cl_nighthash_update(CUDA_NIGHTHASH_CTX *ctx, uint8_t *in, uint32_t inlen, u
    switch(ctx->algo_type)
    {
       case 0:
+#if 0
          cl_blake2b_update(&(ctx->blake2b), in, inlen);
 #ifdef DEBUG
 		 if (debug) {
@@ -859,8 +853,10 @@ void cl_nighthash_update(CUDA_NIGHTHASH_CTX *ctx, uint8_t *in, uint32_t inlen, u
 			 printf("\n");
 		 }
 #endif
+#endif
          break;
       case 1:
+#if 0
          cl_blake2b_update(&(ctx->blake2b), in, inlen);
 #ifdef DEBUG
 		 if (debug) {
@@ -876,6 +872,7 @@ void cl_nighthash_update(CUDA_NIGHTHASH_CTX *ctx, uint8_t *in, uint32_t inlen, u
 				 printf("\n");
 			 }
 		 }
+#endif
 #endif
          break;
       case 2:
@@ -931,6 +928,7 @@ void cl_nighthash_final(CUDA_NIGHTHASH_CTX *ctx, uint8_t *out, uint8_t debug)
    switch(ctx->algo_type)
    {
       case 0:
+#if 0
          cl_blake2b_final(&(ctx->blake2b), out);
 #ifdef DEBUG
 		 if (debug) {
@@ -953,8 +951,10 @@ void cl_nighthash_final(CUDA_NIGHTHASH_CTX *ctx, uint8_t *out, uint8_t debug)
 					 out[28], out[29], out[30], out[31]);
 		 }
 #endif
+#endif
          break;
       case 1:
+#if 0
          cl_blake2b_final(&(ctx->blake2b), out);
 #ifdef DEBUG
 		 if (debug) {
@@ -976,6 +976,7 @@ void cl_nighthash_final(CUDA_NIGHTHASH_CTX *ctx, uint8_t *out, uint8_t debug)
 					 out[24], out[25], out[26], out[27],
 					 out[28], out[29], out[30], out[31]);
 		 }
+#endif
 #endif
          break;
       case 2:
