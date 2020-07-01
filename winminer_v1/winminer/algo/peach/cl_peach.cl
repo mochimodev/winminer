@@ -96,20 +96,11 @@ typedef struct {
 } CUDA_MD2_CTX;
 
 typedef struct {
-	BYTE data[64];
-	WORD datalen;
-	unsigned long bitlen;
-	WORD state[5];
-	WORD k[4];
-} CUDA_SHA1_CTX;
-
-typedef struct {
 
    uint32_t digestlen;
    uint32_t algo_type;
 
    union {
-	   CUDA_SHA1_CTX sha1;
 	   CUDA_MD2_CTX md2;
 	   CUDA_MD5_CTX md5;
    };
@@ -129,9 +120,8 @@ void Blake2B_K32_36B(uchar *out, uchar *in);
 void Blake2B_K64_36B(uchar *out, uchar *in);
 void Blake2B_K32_1060B(uchar *out, uchar *in);
 void Blake2B_K64_1060B(uchar *out, uchar *in);
-void cl_sha1_init(CUDA_SHA1_CTX *ctx);
-void cl_sha1_update(CUDA_SHA1_CTX *ctx, BYTE data[], size_t len);
-void cl_sha1_final(CUDA_SHA1_CTX *ctx, BYTE hash[]);
+void SHA1Digest36B(uint *Digest, const uint *Input);
+void SHA1Digest1060B(uint *Digest, const uint *Input);
 void Keccak256Digest36B(ulong *Digest, const ulong *Input);
 void Keccak256Digest1060B(ulong *Digest, const ulong *Input);
 void SHA3256Digest36B(ulong *Digest, const ulong *Input);
@@ -207,6 +197,11 @@ uint32_t cl_next_index(uint32_t index, __global uint8_t *g_map, uint8_t *nonce, 
 	   Blake2B_K32_1060B((uchar*)hash, (uchar*)seed);
    } else if (nighthash.algo_type == 1) {
 	   Blake2B_K64_1060B((uchar*)hash, (uchar*)seed);
+   } else if (nighthash.algo_type == 2) {
+	   SHA1Digest1060B((uchar*)hash, (uchar*)seed);
+	   for (int i = 0; i < 12; i++) {
+		   hash[20+i] = 0;
+	   }
    } else if (nighthash.algo_type == 3) {
 	   SHA2_256_1056B_1060B((uint*)hash, (uint*)seed, true);
    } else if (nighthash.algo_type == 4) {
@@ -258,6 +253,11 @@ void cl_gen_tile(uint32_t index, __global uint8_t *g_map, uint8_t debug, __globa
 	   Blake2B_K32_36B((uchar*)local_out, (uchar*)seed);
    } else if (nighthash.algo_type == 1) {
 	   Blake2B_K64_36B((uchar*)local_out, (uchar*)seed);
+   } else if (nighthash.algo_type == 2) {
+	   SHA1Digest36B((uchar*)local_out, (uchar*)seed);
+	   for (int i = 0; i < 12; i++) {
+		   local_out[20+i] = 0;
+	   }
    } else if (nighthash.algo_type == 3) {
 	   SHA2_256_36B((uint*)local_out, (uint*)seed);
    } else if (nighthash.algo_type == 4) {
@@ -294,6 +294,11 @@ void cl_gen_tile(uint32_t index, __global uint8_t *g_map, uint8_t debug, __globa
 		   Blake2B_K32_36B((uchar*)local_out, (uchar*)local_out);
 	   } else if (nighthash.algo_type == 1) {
 		   Blake2B_K64_36B((uchar*)local_out, (uchar*)local_out);
+	   } else if (nighthash.algo_type == 2) {
+		   SHA1Digest36B((uchar*)local_out, (uchar*)local_out);
+		   for (int i = 0; i < 12; i++) {
+			   local_out[20+i] = 0;
+		   }
 	   } else if (nighthash.algo_type == 3) {
 		   SHA2_256_36B((uint*)local_out, (uint*)local_out);
 	   } else if (nighthash.algo_type == 4) {
@@ -817,7 +822,7 @@ void cl_nighthash_init(CUDA_NIGHTHASH_CTX *ctx, uint8_t *algo_type_seed,
 #endif
          break;
       case 2:
-         cl_sha1_init(&(ctx->sha1));
+         //cl_sha1_init(&(ctx->sha1));
          break;
       case 3:
          //cl_sha256_init(&(ctx->sha256));
@@ -876,6 +881,7 @@ void cl_nighthash_update(CUDA_NIGHTHASH_CTX *ctx, uint8_t *in, uint32_t inlen, u
 #endif
          break;
       case 2:
+#if 0
          cl_sha1_update(&(ctx->sha1), in, inlen);
 #ifdef DEBUG
 		 if (debug) {
@@ -885,6 +891,7 @@ void cl_nighthash_update(CUDA_NIGHTHASH_CTX *ctx, uint8_t *in, uint32_t inlen, u
 			 }
 			 printf("\n");
 		 }
+#endif
 #endif
          break;
       case 3:
@@ -980,6 +987,7 @@ void cl_nighthash_final(CUDA_NIGHTHASH_CTX *ctx, uint8_t *out, uint8_t debug)
 #endif
          break;
       case 2:
+#if 0
          cl_sha1_final(&(ctx->sha1), out);
          //memset(out + 20, 0, 12);
 	   for (int i = 0; i < 12; i++) {
@@ -1005,6 +1013,7 @@ void cl_nighthash_final(CUDA_NIGHTHASH_CTX *ctx, uint8_t *out, uint8_t debug)
 					 out[24], out[25], out[26], out[27],
 					 out[28], out[29], out[30], out[31]);
 		 }
+#endif
 #endif
          break;
       case 3:
