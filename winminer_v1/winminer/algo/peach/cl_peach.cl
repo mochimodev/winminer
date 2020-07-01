@@ -693,6 +693,7 @@ void cl_bitbyte_transform(uint8_t *data, uint32_t len, uint32_t *op)
       /* Determine operation to use this iteration */
       *op += data[i & 31];
 
+#if 0
       /* Perform random operation */
       switch(*op & 7) {
          case 0: /* Swap the first and last bit in each byte. */
@@ -736,6 +737,42 @@ void cl_bitbyte_transform(uint8_t *data, uint32_t len, uint32_t *op)
                data[z] ^= data[z - 1];
             break;
       } /* end switch(... */
+#endif
+      uint sel = *op & 7;
+
+      if (sel == 0) { /* Swap the first and last bit in each byte. */
+	      for(int idx = 0; idx < len; ++idx)
+		      data[idx] ^= 0x81;
+      } else if (sel == 1) { /* Swap bytes */
+	      for(int idx = 0; idx < (len >> 1); ++idx) {
+		      uint tmp = data[idx];
+		      data[idx] = data[idx + (len >> 1)];
+		      data[idx + (len >> 1)] = tmp;
+	      }
+      } else if (sel == 2) { /* Complement One, all bytes */
+	      for(int idx = 0; idx < len; ++idx)
+		      data[idx] = ~data[idx];
+      } else if (sel == 3) { /* Alternate +1 and -1 on all bytes */
+	      for(int idx = 0; idx < len; ++idx)
+		      data[idx] += ((idx & 1) == 0) ? 1 : -1;
+      } else if (sel == 4) { /* Alternative +i and -i on all bytes */
+	      for(int idx = 0; idx < len; ++idx)
+		      data[idx] += ((idx & 1) == 0) ? -i : i;
+      } else if (sel == 5) { /* Replace every occurence of 104 with 72 */
+	      for(int idx = 0; idx < len; ++idx)
+		      data[idx] = ((data[idx] == 104) ? 72 : data[idx]);
+      } else if (sel == 6) { /* If a > b, swap them */
+	      for(int idx = 0; idx < (len >> 1); ++idx) {
+		      if(data[idx] > data[idx + (len >> 1)]) {
+			      uint tmp = data[idx];
+			      data[idx] = data[idx + (len >> 1)];
+			      data[idx + (len >> 1)] = tmp;
+		      }
+	      }
+      } else { /* XOR all bytes */
+	      for(int idx = 1; idx < len; ++idx)
+		      data[idx] ^= data[idx - 1];
+      }
    } /* end for(i = 0... */ 
 }
 
