@@ -174,7 +174,7 @@ uint32_t cl_next_index(uint32_t index, __global uint8_t *g_map, uint8_t *nonce, 
    } else if (nighthash.algo_type == 1) {
 	   Blake2B_K64_1060B((uchar*)hash, (uchar*)seed);
    } else if (nighthash.algo_type == 2) {
-	   SHA1Digest1060B((uchar*)hash, (uchar*)seed);
+	   SHA1Digest1060B((uint*)hash, (uint*)seed);
 	   for (int i = 0; i < 12; i++) {
 		   hash[20+i] = 0;
 	   }
@@ -229,7 +229,7 @@ void cl_gen_tile(uint32_t index, __global uint8_t *g_map, uint8_t debug, __globa
    } else if (nighthash.algo_type == 1) {
 	   Blake2B_K64_36B((uchar*)local_out, (uchar*)seed);
    } else if (nighthash.algo_type == 2) {
-	   SHA1Digest36B((uchar*)local_out, (uchar*)seed);
+	   SHA1Digest36B((uint*)local_out, (uint*)seed);
 	   for (int i = 0; i < 12; i++) {
 		   local_out[20+i] = 0;
 	   }
@@ -270,7 +270,7 @@ void cl_gen_tile(uint32_t index, __global uint8_t *g_map, uint8_t debug, __globa
 	   } else if (nighthash.algo_type == 1) {
 		   Blake2B_K64_36B((uchar*)local_out, (uchar*)local_out);
 	   } else if (nighthash.algo_type == 2) {
-		   SHA1Digest36B((uchar*)local_out, (uchar*)local_out);
+		   SHA1Digest36B((uint*)local_out, (uint*)local_out);
 		   for (int i = 0; i < 12; i++) {
 			   local_out[20+i] = 0;
 		   }

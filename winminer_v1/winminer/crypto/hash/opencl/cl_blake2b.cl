@@ -125,7 +125,7 @@ void Blake2B_K32_36B(uchar *out, uchar *in)
 
     cl_blake2b_compress(state, (uchar*)input, 0xA4UL, 0xFFFFFFFFFFFFFFFFUL);
 
-	for(int i = 0; i < 8; ++i) ((ulong *)out)[i] = state[i];
+	for(int i = 0; i < 4; ++i) ((ulong *)out)[i] = state[i];
 }
 
 void Blake2B_K32_1060B(uchar *out, uchar *in)
@@ -155,7 +155,7 @@ void Blake2B_K32_1060B(uchar *out, uchar *in)
     cl_blake2b_compress(state, (uchar*)input, 0x4A4UL, 0xFFFFFFFFFFFFFFFFUL);
 
 	#pragma unroll
-	for(int i = 0; i < 8; ++i) ((ulong *)out)[i] = state[i];
+	for(int i = 0; i < 4; ++i) ((ulong *)out)[i] = state[i];
 }
 
 void Blake2B_K64_36B(uchar *out, uchar *in)
@@ -188,7 +188,7 @@ void Blake2B_K64_36B(uchar *out, uchar *in)
     cl_blake2b_compress(state, (uchar*)input, 0xA4UL, 0xFFFFFFFFFFFFFFFFUL);
 
 	#pragma unroll
-	for(int i = 0; i < 8; ++i) ((ulong *)out)[i] = state[i];
+	for(int i = 0; i < 4; ++i) ((ulong *)out)[i] = state[i];
 }
 
 void Blake2B_K64_1060B(uchar *out, uchar *in)
@@ -225,7 +225,7 @@ void Blake2B_K64_1060B(uchar *out, uchar *in)
     cl_blake2b_compress(state, (uchar*)input, 0x4A4UL, 0xFFFFFFFFFFFFFFFFUL);
 
 	#pragma unroll
-	for(int i = 0; i < 8; ++i) ((ulong *)out)[i] = state[i];
+	for(int i = 0; i < 4; ++i) ((ulong *)out)[i] = state[i];
 }
 
 __kernel void test_blake2b(__global uchar *in, __global uchar *out) {
