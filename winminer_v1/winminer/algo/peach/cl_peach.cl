@@ -90,11 +90,12 @@ typedef struct {
 } CUDA_NIGHTHASH_CTX;
 
 uint8_t *trigg_gen(uint8_t *in);
-void cl_nighthash_init(CUDA_NIGHTHASH_CTX *ctx, uint8_t *algo_type_seed,
-                                    uint32_t algo_type_seed_length, uint32_t index,
-                                    uint8_t transform, uint8_t debug);
-void cl_nighthash_update(CUDA_NIGHTHASH_CTX *ctx, uint8_t *in, uint32_t inlen, uint8_t debug);
-void cl_nighthash_final(CUDA_NIGHTHASH_CTX *ctx, uint8_t *out, uint8_t debug);
+void cl_nighthash_init_transform(CUDA_NIGHTHASH_CTX *ctx, uint8_t *algo_type_seed,
+                                    uint32_t algo_type_seed_length, uint32_t index);
+void cl_nighthash_init_notransform(CUDA_NIGHTHASH_CTX *ctx, uint8_t *algo_type_seed,
+                                    uint32_t algo_type_seed_length, uint32_t index);
+void cl_nighthash_update(CUDA_NIGHTHASH_CTX *ctx, uint8_t *in, uint32_t inlen);
+void cl_nighthash_final(CUDA_NIGHTHASH_CTX *ctx, uint8_t *out);
 void SHA2_256_36B(uint *Digest, const uint *InData);
 void SHA2_256_124B(uint *Digest, const uint *InData);
 void SHA2_256_1056B_1060B(uint *Digest, const uint *InData, bool Is1060);
@@ -151,23 +152,12 @@ uint32_t cl_next_index(uint32_t index, __global uint8_t *g_map, uint8_t *nonce, 
 #ifdef DEBUG
    if (debug) {
 	   printf32("first tile: ", (&g_map[index * TILE_LENGTH]));
-	   /*printf("first tile: ");
-	   for (int i = 0; i < TILE_LENGTH; i++) {
-		   printf("%02x ", g_map[index * TILE_LENGTH + i]);
-	   }
-	   printf("\n");*/
-
 	   printf32("cl_next_index seed: ", seed);
-	   /*printf("cl_next_index seed: ");
-	   for (int i = 0; i < seedlen; i++) {
-		   printf("%02x ", seed[i]);
-	   }
-	   printf("\n");*/
    }
 #endif
    
    /* Setup nighthash the seed, NO TRANSFORM */
-   cl_nighthash_init(&nighthash, seed, seedlen, index, 0, debug);
+   cl_nighthash_init_notransform(&nighthash, seed, seedlen, index);
 
    if (nighthash.algo_type == 0) {
 	   Blake2B_K32_1060B((uchar*)hash, (uchar*)seed);
@@ -186,10 +176,10 @@ uint32_t cl_next_index(uint32_t index, __global uint8_t *g_map, uint8_t *nonce, 
 	   Keccak256Digest1060B((ulong*)hash, (ulong*)seed);
    } else {
 	   /* Update nighthash with the seed data */
-	   cl_nighthash_update(&nighthash, seed, seedlen, debug);
+	   cl_nighthash_update(&nighthash, seed, seedlen);
 
 	   /* Finalize nighthash into the first 32 byte chunk of the tile */
-	   cl_nighthash_final(&nighthash, hash, debug);
+	   cl_nighthash_final(&nighthash, hash);
    }
 
    /* Convert 32-byte Hash Value Into 8x 32-bit Unsigned Integer */
@@ -222,7 +212,7 @@ void cl_gen_tile(uint32_t index, __global uint8_t *g_map, uint8_t debug, __globa
     }
 
    /* Setup nighthash with a transform of the seed */
-   cl_nighthash_init(&nighthash, seed, seedlen, index, 1, debug);
+   cl_nighthash_init_transform(&nighthash, seed, seedlen, index);
 
    if (nighthash.algo_type == 0) {
 	   Blake2B_K32_36B((uchar*)local_out, (uchar*)seed);
@@ -242,10 +232,10 @@ void cl_gen_tile(uint32_t index, __global uint8_t *g_map, uint8_t debug, __globa
    } else {
 
 	   /* Update nighthash with the seed data */
-	   cl_nighthash_update(&nighthash, seed, seedlen, debug);
+	   cl_nighthash_update(&nighthash, seed, seedlen);
 
 	   /* Finalize nighthash into the first 32 byte chunk of the tile */
-	   cl_nighthash_final(&nighthash, local_out, debug);
+	   cl_nighthash_final(&nighthash, local_out);
    }
 
    for (int i = 0; i < HASHLEN; i++) {
@@ -256,7 +246,7 @@ void cl_gen_tile(uint32_t index, __global uint8_t *g_map, uint8_t debug, __globa
    for(i = 0, j = HASHLEN; j < TILE_LENGTH; i += HASHLEN, j += HASHLEN) { /* For each tile row */
 	   /* Hash the current row to the next, if not at the end */
 	   /* Setup nighthash with a transform of the current row */
-	   cl_nighthash_init(&nighthash, local_out, HASHLEN, index, 1, debug);
+	   cl_nighthash_init_transform(&nighthash, local_out, HASHLEN, index);
 	   for (int z = 0; z < HASHLEN; z++) {
 		   tilep[i+z] = local_out[z];
 	   }
@@ -282,8 +272,8 @@ void cl_gen_tile(uint32_t index, __global uint8_t *g_map, uint8_t debug, __globa
 		   Keccak256Digest36B((ulong*)local_out, (ulong*)local_out);
 	   } else {
 		   /* Update nighthash with the seed data and tile index */
-		   cl_nighthash_update(&nighthash, local_out, HASHLEN+4, debug);
-		   cl_nighthash_final(&nighthash, local_out, debug);
+		   cl_nighthash_update(&nighthash, local_out, HASHLEN+4);
+		   cl_nighthash_final(&nighthash, local_out);
 	   }
 	   for (int z = 0; z < HASHLEN; z++) {
 		   tilep[j+z] = local_out[z];
@@ -307,14 +297,6 @@ __kernel void cl_build_map(__global uint8_t *g_map, __global uint8_t *c_phash, u
 	   CUDA_NIGHTHASH_CTX ctx;
 	   printf("%p\n", &(ctx.md5));
    }
-
-/*   if (thread == 0) {
-	   printf("tile 0: ");
-	   for (int i = 0; i < TILE_LENGTH; i++) {
-		   printf("%02x ", g_map[i]);
-	   }
-	   printf("\n");
-   }*/
 }
 
 
@@ -342,12 +324,6 @@ __kernel void cl_find_peach(uint32_t threads, __global uint8_t *g_map,
          seed[ 6] = Z_ING[(thread >> 16) & 1];
       }
 
-      /*printf("Seed: ");
-      for (int j = 0; j < 16; j++) {
-	      printf("%02x ", seed[j]);
-      }
-      printf("\n");*/
-
       /* store full nonce */
       #pragma unroll
       for (i = 0; i < 16; i++)
@@ -356,12 +332,6 @@ __kernel void cl_find_peach(uint32_t threads, __global uint8_t *g_map,
       #pragma unroll
       for (i = 0; i < 16; i++)
          nonce[i+16] = seed[i];
-
-      /*printf("Nonce: ");
-      for (int j = 0; j < 32; j++) {
-	      printf("%02x ", nonce[j]);
-      }
-      printf("\n");*/
 
       /*********************************************************/
       /* Hash 124 bytes of Block Trailer, including both seeds */
@@ -446,17 +416,6 @@ if (n>=c_difficulty) {
 		printf16("seed: ", seed);
 		printf32("hash: ", fhash);
 		printf32("bt_hash: ", bt_hash);
-#if 0
-		printf("l_tile: ");
-		for (int j = 0; j < HASHLEN; j++) {
-#ifdef AMD
-			printf("%02x ", l_tile[j]);
-#else
-			printf("%02x ", g_map[sm*TILE_LENGTH+j]);
-#endif
-		}
-		printf("\n");
-#endif
 #endif
       }
       /* Our princess is in another castle ! */
@@ -492,8 +451,8 @@ if (n>=c_difficulty) {
  * @param index     - the current tile
  * @param *op       - pointer to the operator value
  * @param transform - flag indicates to transform the input data */
-void cl_fp_operation(uint8_t *data, uint32_t len, uint32_t index,
-                                  uint32_t *op, uint8_t transform, uint8_t debug)
+void cl_fp_operation_transform(uint8_t *data, uint32_t len, uint32_t index,
+                                  uint32_t *op)
 {
    uint8_t *temp;
    uint32_t adjustedlen;
@@ -502,133 +461,179 @@ void cl_fp_operation(uint8_t *data, uint32_t len, uint32_t index,
    float *floatp;
    
    /* Adjust the length to a multiple of 4 */
-   adjustedlen = (len >> 2) << 2;
+   adjustedlen = len & 0xfffffffc;
 
    /* Work on data 4 bytes at a time */
+#pragma unroll
    for(i = 0; i < adjustedlen; i += 4)
    {
       /* Cast 4 byte piece to float pointer */
-      if(transform)
          floatp = (float *) &data[i];
-      else {
-         floatv1 = *(float *) &data[i];
-         floatp = &floatv1;
-      }
 
       /* 4 byte separation order depends on initial byte:
        * #1) *op = data... determine floating point operation type
        * #2) operand = ... determine the value of the operand
        * #3) if(data[i ... determine the sign of the operand
        *                   ^must always be performed after #2) */
-#ifdef DEBUG
-      if (debug) {
-	      printf("data[i] & 7 = %d\n", data[i] & 7);
+      uint d7 = data[i] & 7;
+      if (d7 == 0) {
+            *op += data[i + 1];
+            operand = data[i + 2];
+            if(data[i + 3] & 1) operand ^= 0x80000000;
+      } else if (d7 == 1) {
+            operand = data[i + 1];
+            if(data[i + 2] & 1) operand ^= 0x80000000;
+            *op += data[i + 3];
+      } else if (d7 == 2) {
+            *op += data[i];
+            operand = data[i + 2];
+            if(data[i + 3] & 1) operand ^= 0x80000000;
+      } else if (d7 == 3) {
+            *op += data[i];
+            operand = data[i + 1];
+            if(data[i + 2] & 1) operand ^= 0x80000000;
+      } else if (d7 == 4) {
+            operand = data[i];
+            if(data[i + 1] & 1) operand ^= 0x80000000;
+            *op += data[i + 3];
+      } else if (d7 == 5) {
+            operand = data[i];
+            if(data[i + 1] & 1) operand ^= 0x80000000;
+            *op += data[i + 2];
+      } else if (d7 == 6) {
+            *op += data[i + 1];
+            operand = data[i + 1];
+            if(data[i + 3] & 1) operand ^= 0x80000000;
+      } else if (d7 == 7) {
+            operand = data[i + 1];
+            *op += data[i + 2];
+            if(data[i + 3] & 1) operand ^= 0x80000000;
       }
-#endif
-      switch(data[i] & 7)
-      {
-         case 0:
-            *op += data[i + 1];
-            operand = data[i + 2];
-            if(data[i + 3] & 1) operand ^= 0x80000000;
-            break;
-         case 1:
-            operand = data[i + 1];
-            if(data[i + 2] & 1) operand ^= 0x80000000;
-            *op += data[i + 3];
-            break;
-         case 2:
-            *op += data[i];
-            operand = data[i + 2];
-            if(data[i + 3] & 1) operand ^= 0x80000000;
-            break;
-         case 3:
-            *op += data[i];
-            operand = data[i + 1];
-            if(data[i + 2] & 1) operand ^= 0x80000000;
-            break;
-         case 4:
-            operand = data[i];
-            if(data[i + 1] & 1) operand ^= 0x80000000;
-            *op += data[i + 3];
-            break;
-         case 5:
-            operand = data[i];
-            if(data[i + 1] & 1) operand ^= 0x80000000;
-            *op += data[i + 2];
-            break;
-         case 6:
-            *op += data[i + 1];
-            operand = data[i + 1];
-            if(data[i + 3] & 1) operand ^= 0x80000000;
-            break;
-         case 7:
-            operand = data[i + 1];
-            *op += data[i + 2];
-            if(data[i + 3] & 1) operand ^= 0x80000000;
-            break;
-      } /* end switch(data[j] & 31... */
 
       /* Cast operand to float */
       floatv = operand;
-#ifdef DEBUG
-      if (debug) {
-	      printf("floatv: %f\n", floatv);
-      }
-#endif
 
       /* Replace pre-operation NaN with index */
       if(isnan(*floatp)) *floatp = index;
-#ifdef DEBUG
-      if (debug){
-	      printf("*floatp: %f\n", *floatp);
-      }
-#endif
 
       /* Perform predetermined floating point operation */
-#ifdef DEBUG
-      if (debug) {
-	      printf("*op & 3 = %d\n", *op & 3);
-      }
-#endif
-      switch(*op & 3) {
-         case 0:
+      uint lop = *op & 3;
+      if (lop == 0) {
             *floatp += floatv;
-            break;
-         case 1:
+      } else if (lop == 1) {
             *floatp -= floatv;
-            break;
-         case 2:
+      } else if (lop == 2) {
             *floatp *= floatv;
-            break;
-         case 3:
+      } else if (lop == 3) {
             *floatp /= floatv;
-            break;
       }
 
       /* Replace post-operation NaN with index */
       if(isnan(*floatp)) *floatp = index;
-#ifdef DEBUG
-      if (debug) {
-	      printf("*floatp: %f\n", *floatp);
-      }
-#endif
 
       /* Add result of floating point operation to op */
       temp = (uint8_t *) floatp;
       for(j = 0; j < 4; j++) {
-#ifdef DEBUG
-	      if (debug) {
-	      printf("*op += %d\n", temp[j]);
-	      }
-#endif
          *op += temp[j];
       }
-#ifdef DEBUG
-      if (debug) {
-	      printf("*op: %d\n", *op);
+   } /* end for(*op = 0... */
+}
+
+/**
+ * Performs data transformation on 32 bit chunks (4 bytes) of data
+ * using deterministic floating point operations on IEEE 754
+ * compliant machines and devices.
+ * @param *data     - pointer to in data (at least 32 bytes)
+ * @param len       - length of data
+ * @param index     - the current tile
+ * @param *op       - pointer to the operator value
+ * @param transform - flag indicates to transform the input data */
+void cl_fp_operation_notransform(uint8_t *data, uint32_t len, uint32_t index,
+                                  uint32_t *op)
+{
+   uint8_t *temp;
+   uint32_t adjustedlen;
+   int32_t i, j, operand;
+   float floatv, floatv1;
+   float *floatp;
+   
+   /* Adjust the length to a multiple of 4 */
+   adjustedlen = len & 0xfffffffc;
+
+   /* Work on data 4 bytes at a time */
+#pragma unroll
+   for(i = 0; i < adjustedlen; i += 4)
+   {
+      /* Cast 4 byte piece to float pointer */
+         floatv1 = *(float *) &data[i];
+         floatp = &floatv1;
+
+      /* 4 byte separation order depends on initial byte:
+       * #1) *op = data... determine floating point operation type
+       * #2) operand = ... determine the value of the operand
+       * #3) if(data[i ... determine the sign of the operand
+       *                   ^must always be performed after #2) */
+      uint d7 = data[i] & 7;
+      if (d7 == 0) {
+            *op += data[i + 1];
+            operand = data[i + 2];
+            if(data[i + 3] & 1) operand ^= 0x80000000;
+      } else if (d7 == 1) {
+            operand = data[i + 1];
+            if(data[i + 2] & 1) operand ^= 0x80000000;
+            *op += data[i + 3];
+      } else if (d7 == 2) {
+            *op += data[i];
+            operand = data[i + 2];
+            if(data[i + 3] & 1) operand ^= 0x80000000;
+      } else if (d7 == 3) {
+            *op += data[i];
+            operand = data[i + 1];
+            if(data[i + 2] & 1) operand ^= 0x80000000;
+      } else if (d7 == 4) {
+            operand = data[i];
+            if(data[i + 1] & 1) operand ^= 0x80000000;
+            *op += data[i + 3];
+      } else if (d7 == 5) {
+            operand = data[i];
+            if(data[i + 1] & 1) operand ^= 0x80000000;
+            *op += data[i + 2];
+      } else if (d7 == 6) {
+            *op += data[i + 1];
+            operand = data[i + 1];
+            if(data[i + 3] & 1) operand ^= 0x80000000;
+      } else if (d7 == 7) {
+            operand = data[i + 1];
+            *op += data[i + 2];
+            if(data[i + 3] & 1) operand ^= 0x80000000;
       }
-#endif
+
+      /* Cast operand to float */
+      floatv = operand;
+
+      /* Replace pre-operation NaN with index */
+      if(isnan(*floatp)) *floatp = index;
+
+      /* Perform predetermined floating point operation */
+      uint lop = *op & 3;
+      if (lop == 0) {
+            *floatp += floatv;
+      } else if (lop == 1) {
+            *floatp -= floatv;
+      } else if (lop == 2) {
+            *floatp *= floatv;
+      } else if (lop == 3) {
+            *floatp /= floatv;
+      }
+
+      /* Replace post-operation NaN with index */
+      if(isnan(*floatp)) *floatp = index;
+
+      /* Add result of floating point operation to op */
+      temp = (uint8_t *) floatp;
+      for(j = 0; j < 4; j++) {
+         *op += temp[j];
+      }
    } /* end for(*op = 0... */
 }
 
@@ -641,61 +646,13 @@ void cl_fp_operation(uint8_t *data, uint32_t len, uint32_t index,
  * @param *op       - pointer to the operator value */
 void cl_bitbyte_transform(uint8_t *data, uint32_t len, uint32_t *op)
 {
-   int32_t i, z;
-   uint32_t len2;
-   uint8_t temp, _104, _72;
-
    /* Perform <TILE_TRANSFORMS> number of bit/byte manipulations */
-   for(i = 0, _104 = 104, _72 = 72, len2 = len/2; i < TILE_TRANSFORMS; i++)
+#pragma unroll
+   for(int32_t i = 0; i < TILE_TRANSFORMS; i++)
    {
       /* Determine operation to use this iteration */
       *op += data[i & 31];
 
-#if 0
-      /* Perform random operation */
-      switch(*op & 7) {
-         case 0: /* Swap the first and last bit in each byte. */
-            for(z = 0; z < len; z++)
-               data[z] ^= 0x81;
-            break;
-         case 1: /* Swap bytes */
-            for(z = 0; z < len2; z++) {
-               temp = data[z];
-               data[z] = data[z + len2];
-               data[z + len2] = temp;
-            }
-            break;
-         case 2: /* Complement One, all bytes */
-            for(z = 0; z < len; z++)
-               data[z] = ~data[z];
-            break;
-         case 3: /* Alternate +1 and -1 on all bytes */
-            for(z = 0; z < len; z++)
-               data[z] += ((z & 1) == 0) ? 1 : -1;
-            break;
-         case 4: /* Alternate +i and -i on all bytes */
-            for(z = 0; z < len; z++)
-               data[z] += ((z & 1) == 0) ? -i : i;
-            break;
-         case 5: /* Replace every occurrence of _104 with _72 */ 
-            for(z = 0; z < len; z++)
-               if(data[z] == _104) data[z] = _72;
-            break;
-         case 6: /* If byte a is > byte b, swap them. */
-            for(z = 0; z < len2; z++) {
-               if(data[z] > data[z + len2]) {
-                  temp = data[z];
-                  data[z] = data[z + len2];
-                  data[z + len2] = temp;
-               }
-            }
-            break;
-         case 7: /* XOR all bytes */
-            for(z = 1; z < len; z++)
-               data[z] ^= data[z - 1];
-            break;
-      } /* end switch(... */
-#endif
       uint sel = *op & 7;
 
       if (sel == 0) { /* Swap the first and last bit in each byte. */
@@ -734,112 +691,85 @@ void cl_bitbyte_transform(uint8_t *data, uint32_t len, uint32_t *op)
    } /* end for(i = 0... */ 
 }
 
-void cl_nighthash_init(CUDA_NIGHTHASH_CTX *ctx, uint8_t *algo_type_seed,
-                                    uint32_t algo_type_seed_length, uint32_t index,
-                                    uint8_t transform, uint8_t debug)
-{
-   uint32_t algo_type;
-   uint8_t key32[32], key64[64];
-   algo_type = 0;
-   
-   /* Perform floating point operations to transform (if transform byte is set)
-    * input data and determine algo type */
-   cl_fp_operation(algo_type_seed, algo_type_seed_length, index, &algo_type, transform, debug);
-#ifdef DEBUG
-   if (debug) {
-	   printf("fp: algo_type: %d\n", algo_type);
-   }
-#endif
-   
-   /* Perform bit/byte transform operations to transform (if transform byte is set)
-    * input data and determine algo type */
-   if(transform) {
-      cl_bitbyte_transform(algo_type_seed, algo_type_seed_length, &algo_type);
-   }
-#ifdef DEBUG
-   if (debug) {
-	   printf("transform?: %d: algo_type: %d\n", transform, algo_type);
-   }
-#endif
-   
-   /* Clear nighthash context */
-   for (int i = 0; i < sizeof(CUDA_NIGHTHASH_CTX); i++) {
-	   ((uint8_t*)ctx)[i] = 0;
-   }
+void cl_nighthash_init_transform(CUDA_NIGHTHASH_CTX *ctx, uint8_t *algo_type_seed,
+		uint32_t algo_type_seed_length, uint32_t index) {
+	uint32_t algo_type;
+	uint8_t key32[32], key64[64];
+	algo_type = 0;
 
-   ctx->digestlen = 32;
-   ctx->algo_type = algo_type & 7;
-   
-#ifdef DEBUG
-   if (debug) {
-	   printf("algo_type: %d\n", ctx->algo_type);
-   }
-#endif
+	/* Perform floating point operations to transform (if transform byte is set)
+	 * input data and determine algo type */
+	cl_fp_operation_transform(algo_type_seed, algo_type_seed_length, index, &algo_type);
 
-   switch(ctx->algo_type)
-   {
-      case 6:
-         cl_md2_init(&(ctx->md2));
-         break;
-      case 7:
-         cl_md5_init(&(ctx->md5));
-         break;
-      default:
-	 break;
-   } /* end switch(algo_type)... */
+	/* Perform bit/byte transform operations to transform (if transform byte is set)
+	 * input data and determine algo type */
+	cl_bitbyte_transform(algo_type_seed, algo_type_seed_length, &algo_type);
+
+	/* Clear nighthash context */
+	for (int i = 0; i < sizeof(CUDA_NIGHTHASH_CTX); i++) {
+		((uint8_t*)ctx)[i] = 0;
+	}
+
+	ctx->digestlen = 32;
+	ctx->algo_type = algo_type & 7;
+
+	switch(ctx->algo_type)
+	{
+		case 6:
+			cl_md2_init(&(ctx->md2));
+			break;
+		case 7:
+			cl_md5_init(&(ctx->md5));
+			break;
+		default:
+			break;
+	} /* end switch(algo_type)... */
 }
 
-void cl_nighthash_update(CUDA_NIGHTHASH_CTX *ctx, uint8_t *in, uint32_t inlen, uint8_t debug)
-{
-   switch(ctx->algo_type)
-   {
-      case 6:
-         cl_md2_update(&(ctx->md2), in, inlen);
-#ifdef DEBUG
-		 if (debug) {
-			 printf("md2 update: ");
-			 for (int i = 0; i < inlen; i++) {
-				 printf("%02x ", in[i]);
-			 }
-			 printf("\n");
-		 }
-#endif
-         break;
-      case 7:
-         cl_md5_update(&(ctx->md5), in, inlen);
-#ifdef DEBUG
-		 if (debug) {
-			 printf("md5 update: ");
-			 for (int i = 0; i < inlen; i++) {
-				 printf("%02x ", in[i]);
-			 }
-			 printf("\n");
-		 }
-#endif
-         break;
-      default:
-	 break;
-   } /* end switch(ctx->... */
+void cl_nighthash_init_notransform(CUDA_NIGHTHASH_CTX *ctx, uint8_t *algo_type_seed,
+		uint32_t algo_type_seed_length, uint32_t index) {
+	uint32_t algo_type;
+	uint8_t key32[32], key64[64];
+	algo_type = 0;
+
+	/* Perform floating point operations to transform (if transform byte is set)
+	 * input data and determine algo type */
+	cl_fp_operation_notransform(algo_type_seed, algo_type_seed_length, index, &algo_type);
+
+	/* Clear nighthash context */
+	for (int i = 0; i < sizeof(CUDA_NIGHTHASH_CTX); i++) {
+		((uint8_t*)ctx)[i] = 0;
+	}
+
+	ctx->digestlen = 32;
+	ctx->algo_type = algo_type & 7;
+
+	if (ctx->algo_type == 6) {
+		cl_md2_init(&(ctx->md2));
+	} else if (ctx->algo_type == 7) {
+		cl_md5_init(&(ctx->md5));
+	}
 }
 
-void cl_nighthash_final(CUDA_NIGHTHASH_CTX *ctx, uint8_t *out, uint8_t debug)
-{
-   switch(ctx->algo_type)
-   {
-      case 6:
-         cl_md2_final(&(ctx->md2), out);
-	   for (int i = 0; i < 16; i++) {
-		   ((uint8_t*)(out+16))[i] = 0;
-	   }
-         break;
-      case 7:
-         cl_md5_final(&(ctx->md5), out);
-	   for (int i = 0; i < 16; i++) {
-		   ((uint8_t*)(out+16))[i] = 0;
-	   }
-         break;
-      default:
-	 break;
-   } /* end switch(ctx->... */
+void cl_nighthash_update(CUDA_NIGHTHASH_CTX *ctx, uint8_t *in, uint32_t inlen) {
+	if (ctx->algo_type == 6) {
+		cl_md2_update(&(ctx->md2), in, inlen);
+	} else if (ctx->algo_type == 7) {
+		cl_md5_update(&(ctx->md5), in, inlen);
+	}
+}
+
+void cl_nighthash_final(CUDA_NIGHTHASH_CTX *ctx, uint8_t *out) {
+	if (ctx->algo_type == 6) {
+		cl_md2_final(&(ctx->md2), out);
+		for (int i = 0; i < 16; i++) {
+			((uint8_t*)(out+16))[i] = 0;
+		}
+	} else if (ctx->algo_type == 7) {
+		cl_md5_final(&(ctx->md5), out);
+		for (int i = 0; i < 16; i++) {
+			((uint8_t*)(out+16))[i] = 0;
+		}
+	}
 }
 
