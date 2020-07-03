@@ -180,16 +180,14 @@ uint32_t cl_next_index(uint32_t index, __global uint8_t *g_map, uint8_t *nonce, 
 void cl_gen_tile(uint32_t index, __global uint8_t *g_map, uint8_t debug, __global uint8_t *c_phash)
 {
    CUDA_NIGHTHASH_CTX nighthash;
+   const int seedlen = 4 + HASHLEN;
    uint8_t seed[4 + HASHLEN];
-   global uint8_t *tilep;
    uint8_t local_out[4 + HASHLEN];
-   int i, j, seedlen;
 
    /* Set map pointer */
-   tilep = &g_map[index * TILE_LENGTH];
+   global uint8_t *tilep = &g_map[index * TILE_LENGTH];
 
    /* Create nighthash seed for this index on the map */
-   seedlen = 4 + HASHLEN;
    ((uint32_t*)(seed))[0] = ((uint32_t*)&index)[0];
    #pragma unroll
    for (int i = 0; i < HASHLEN/4; i++) {
@@ -230,7 +228,7 @@ void cl_gen_tile(uint32_t index, __global uint8_t *g_map, uint8_t debug, __globa
    }
 
    /* Begin constructing the full tile */
-   for(i = 0, j = HASHLEN; j < TILE_LENGTH; i += HASHLEN, j += HASHLEN) { /* For each tile row */
+   for(int i = 0, j = HASHLEN; j < TILE_LENGTH; i += HASHLEN, j += HASHLEN) { /* For each tile row */
 	   /* Hash the current row to the next, if not at the end */
 	   /* Setup nighthash with a transform of the current row */
 	   cl_nighthash_init_transform_32B(&nighthash, local_out, index);
@@ -270,8 +268,7 @@ void cl_gen_tile(uint32_t index, __global uint8_t *g_map, uint8_t debug, __globa
 }
 
 
-__kernel void cl_build_map(__global uint8_t *g_map, __global uint8_t *c_phash, uint32_t start_index)
-{
+__kernel void cl_build_map(__global uint8_t *g_map, __global uint8_t *c_phash, uint32_t start_index) {
    uint32_t thread = get_global_id(0) + start_index;
    if (thread < MAP) {
       cl_gen_tile(thread, g_map, /*thread == 32 ? 1 :*/ 0 , c_phash);
@@ -296,9 +293,6 @@ __kernel void cl_find_peach(uint32_t threads, __global uint8_t *g_map,
 
    uint8_t seed[16] = {0}, nonce[32] = {0};
    uint8_t bt_hash[32], fhash[32];
-   int32_t i, j, n;
-   uint8_t x;
-   uint32_t sm;
 
    if (thread < threads && thread < 131072) {
       /* Determine second seed */
@@ -314,11 +308,11 @@ __kernel void cl_find_peach(uint32_t threads, __global uint8_t *g_map,
 
       /* store full nonce */
       #pragma unroll
-      for (i = 0; i < 16; i++)
+      for (int i = 0; i < 16; i++)
          nonce[i] = c_input[i + 92];
 
       #pragma unroll
-      for (i = 0; i < 16; i++)
+      for (int i = 0; i < 16; i++)
          nonce[i+16] = seed[i];
 
       /*********************************************************/
@@ -338,9 +332,9 @@ __kernel void cl_find_peach(uint32_t threads, __global uint8_t *g_map,
       /****************************************************/
       /* Follow the tile path based on the selected nonce */
       
-      sm = bt_hash[0];
+      uint32_t sm = bt_hash[0];
       #pragma unroll
-      for(i = 1; i < HASHLEN; i++) {
+      for(int i = 1; i < HASHLEN; i++) {
          sm *= bt_hash[i];
       }
       //sm %= MAP;
@@ -349,7 +343,7 @@ __kernel void cl_find_peach(uint32_t threads, __global uint8_t *g_map,
       uint32_t sm_chain[JUMP];
       /* make <JUMP> tile jumps to find the final tile */
       #pragma unroll
-      for(j = 0; j < JUMP; j++) {
+      for(int j = 0; j < JUMP; j++) {
         sm = cl_next_index(sm, g_map, nonce, scratch);
 	sm_chain[j] = sm;
       }
@@ -369,8 +363,9 @@ __kernel void cl_find_peach(uint32_t threads, __global uint8_t *g_map,
       SHA2_256_1056B_1060B((uint*)fhash, (uint*)btbuf, false);
 
       /* Evaluate hash */
-      for (x = i = j = n = 0; i < HASHLEN; i++) {
-	      x = fhash[i];
+      int32_t n = 0;
+      for (int32_t i = 0; i < HASHLEN; i++) {
+	      uint8_t x = fhash[i];
 	      if (x != 0) {
 		      n += clz(x);
 		      break;
@@ -378,14 +373,14 @@ __kernel void cl_find_peach(uint32_t threads, __global uint8_t *g_map,
 	      n += 8;
       }
 
-      if (n>=c_difficulty) {
+      if (n >= c_difficulty) {
 	      printf("found!! t: %d, n: %d\n", thread, n);
       }
 
       if (n >= c_difficulty && !atomic_xchg(g_found, 1)) {
 	      /* PRINCESS FOUND! */
 	      #pragma unroll
-	      for (i = 0; i < 2; i++) {
+	      for (int i = 0; i < 2; i++) {
 		      ((global uint64_t*)(g_seed))[i] = ((uint64_t*)(seed))[i];
 	      }
       }
@@ -425,13 +420,13 @@ __kernel void cl_find_peach(uint32_t threads, __global uint8_t *g_map,
 uint32_t cl_fp_operation_transform_32B(uint8_t *data, uint32_t index) {
    const uint32_t adjustedlen = 32;
    uint32_t op = 0;
-   int32_t i, j, operand;
+   int32_t operand;
    float floatv, floatv1;
    float *floatp;
    
    /* Work on data 4 bytes at a time */
-#pragma unroll 16
-   for(i = 0; i < adjustedlen; i += 4) {
+   #pragma unroll 16
+   for(int i = 0; i < adjustedlen; i += 4) {
       uchar udata[4];
       ((uint*)udata)[0] = ((uint*)(data+i))[0];
       /* Cast 4 byte piece to float pointer */
@@ -448,9 +443,9 @@ uint32_t cl_fp_operation_transform_32B(uint8_t *data, uint32_t index) {
             operand = udata[2];
             if(udata[3] & 1) operand ^= 0x80000000;
       } else if (d7 == 1) {
+            op += udata[3];
             operand = udata[1];
             if(udata[2] & 1) operand ^= 0x80000000;
-            op += udata[3];
       } else if (d7 == 2) {
             op += udata[0];
             operand = udata[2];
@@ -460,20 +455,20 @@ uint32_t cl_fp_operation_transform_32B(uint8_t *data, uint32_t index) {
             operand = udata[1];
             if(udata[2] & 1) operand ^= 0x80000000;
       } else if (d7 == 4) {
-            operand = udata[0];
-            if(udata[1] & 1) operand ^= 0x80000000;
             op += udata[3];
-      } else if (d7 == 5) {
             operand = udata[0];
             if(udata[1] & 1) operand ^= 0x80000000;
+      } else if (d7 == 5) {
             op += udata[2];
+            operand = udata[0];
+            if(udata[1] & 1) operand ^= 0x80000000;
       } else if (d7 == 6) {
             op += udata[1];
             operand = udata[1];
             if(udata[3] & 1) operand ^= 0x80000000;
       } else if (d7 == 7) {
-            operand = udata[1];
             op += udata[2];
+            operand = udata[1];
             if(udata[3] & 1) operand ^= 0x80000000;
       }
 
@@ -481,7 +476,7 @@ uint32_t cl_fp_operation_transform_32B(uint8_t *data, uint32_t index) {
       floatv = operand;
 
       /* Replace pre-operation NaN with index */
-      if(isnan(*floatp)) *floatp = index;
+      if (isnan(*floatp)) *floatp = index;
 
       /* Perform predetermined floating point operation */
       uint lop = op & 3;
@@ -496,11 +491,11 @@ uint32_t cl_fp_operation_transform_32B(uint8_t *data, uint32_t index) {
       }
 
       /* Replace post-operation NaN with index */
-      if(isnan(*floatp)) *floatp = index;
+      if (isnan(*floatp)) *floatp = index;
 
       /* Add result of floating point operation to op */
       uint8_t *temp = (uint8_t *) floatp;
-      for(j = 0; j < 4; j++) {
+      for (int j = 0; j < 4; j++) {
          op += temp[j];
       }
 
@@ -512,13 +507,13 @@ uint32_t cl_fp_operation_transform_32B(uint8_t *data, uint32_t index) {
 uint32_t cl_fp_operation_transform_36B(uint8_t *data, uint32_t index) {
    const uint32_t adjustedlen = 36;
    uint32_t op = 0;
-   int32_t i, j, operand;
+   int32_t operand;
    float floatv;
    float *floatp;
    
    /* Work on data 4 bytes at a time */
-#pragma unroll 18
-   for(i = 0; i < adjustedlen; i += 4) {
+   #pragma unroll 18
+   for (int i = 0; i < adjustedlen; i += 4) {
       uchar udata[4];
       ((uint*)udata)[0] = ((uint*)(data+i))[0];
       /* Cast 4 byte piece to float pointer */
@@ -535,9 +530,9 @@ uint32_t cl_fp_operation_transform_36B(uint8_t *data, uint32_t index) {
             operand = udata[2];
             if(udata[3] & 1) operand ^= 0x80000000;
       } else if (d7 == 1) {
+            op += udata[3];
             operand = udata[1];
             if(udata[2] & 1) operand ^= 0x80000000;
-            op += udata[3];
       } else if (d7 == 2) {
             op += udata[0];
             operand = udata[2];
@@ -547,20 +542,20 @@ uint32_t cl_fp_operation_transform_36B(uint8_t *data, uint32_t index) {
             operand = udata[1];
             if(udata[2] & 1) operand ^= 0x80000000;
       } else if (d7 == 4) {
-            operand = udata[0];
-            if(udata[1] & 1) operand ^= 0x80000000;
             op += udata[3];
-      } else if (d7 == 5) {
             operand = udata[0];
             if(udata[1] & 1) operand ^= 0x80000000;
+      } else if (d7 == 5) {
             op += udata[2];
+            operand = udata[0];
+            if(udata[1] & 1) operand ^= 0x80000000;
       } else if (d7 == 6) {
             op += udata[1];
             operand = udata[1];
             if(udata[3] & 1) operand ^= 0x80000000;
       } else if (d7 == 7) {
-            operand = udata[1];
             op += udata[2];
+            operand = udata[1];
             if(udata[3] & 1) operand ^= 0x80000000;
       }
 
@@ -583,11 +578,11 @@ uint32_t cl_fp_operation_transform_36B(uint8_t *data, uint32_t index) {
       }
 
       /* Replace post-operation NaN with index */
-      if(isnan(*floatp)) *floatp = index;
+      if (isnan(*floatp)) *floatp = index;
 
       /* Add result of floating point operation to op */
       uint8_t *temp = (uint8_t *) floatp;
-      for(j = 0; j < 4; j++) {
+      for (int j = 0; j < 4; j++) {
          op += temp[j];
       }
 
@@ -608,12 +603,12 @@ uint32_t cl_fp_operation_transform_36B(uint8_t *data, uint32_t index) {
 uint32_t cl_fp_operation_notransform_1060B(uint8_t *data, uint32_t index) {
    const uint32_t adjustedlen = 1060;
    uint32_t op = 0;
-   int32_t i, j, operand;
+   int32_t operand;
    float floatv, floatv1;
    
    /* Work on data 4 bytes at a time */
-#pragma unroll 10
-   for(i = 0; i < adjustedlen; i += 4) {
+   #pragma unroll 10
+   for(int i = 0; i < adjustedlen; i += 4) {
       uchar udata[4];
       ((uint*)udata)[0] = ((uint*)(data+i))[0];
       /* Cast 4 byte piece to float pointer */
@@ -665,7 +660,7 @@ uint32_t cl_fp_operation_notransform_1060B(uint8_t *data, uint32_t index) {
       floatv = operand;
 
       /* Replace pre-operation NaN with index */
-      if(isnan(floatv1)) floatv1 = index;
+      if (isnan(floatv1)) floatv1 = index;
 
       /* Perform predetermined floating point operation */
       uint lop = op & 3;
@@ -680,12 +675,12 @@ uint32_t cl_fp_operation_notransform_1060B(uint8_t *data, uint32_t index) {
       }
 
       /* Replace post-operation NaN with index */
-      if(isnan(floatv1)) floatv1 = index;
+      if (isnan(floatv1)) floatv1 = index;
 
       /* Add result of floating point operation to op */
       uint utemp = as_uint(floatv1);
       uchar *temp = (uchar*)&utemp;
-      for(j = 0; j < 4; j++) {
+      for (int j = 0; j < 4; j++) {
          op += temp[j];
       }
    } /* end for(*op = 0... */
@@ -699,12 +694,10 @@ uint32_t cl_fp_operation_notransform_1060B(uint8_t *data, uint32_t index) {
  * @param *data     - pointer to in data
  * @param len       - length of data
  * @param *op       - pointer to the operator value */
-uint32_t cl_bitbyte_transform(uint8_t *data, uint32_t len, uint32_t op)
-{
+uint32_t cl_bitbyte_transform(uint8_t *data, uint32_t len, uint32_t op) {
    /* Perform <TILE_TRANSFORMS> number of bit/byte manipulations */
-#pragma unroll
-   for(int32_t i = 0; i < TILE_TRANSFORMS; i++)
-   {
+   #pragma unroll
+   for(int32_t i = 0; i < TILE_TRANSFORMS; i++) {
       /* Determine operation to use this iteration */
       op += data[i & 31];
 
