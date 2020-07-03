@@ -125,7 +125,7 @@ uint32_t cl_next_index(uint32_t index, __global uint8_t *g_map, uint8_t *nonce, 
    uint8_t *seed = scratch;
    const int seedlen = HASHLEN + 4 + TILE_LENGTH;
 
-   uint32_t hash[HASHLEN];
+   uint32_t hash[HASHLEN/4];
 
    /* Create nighthash seed for this index on the map */
    #pragma unroll
@@ -169,8 +169,8 @@ uint32_t cl_next_index(uint32_t index, __global uint8_t *g_map, uint8_t *nonce, 
    /* Convert 32-byte Hash Value Into 8x 32-bit Unsigned Integer */
    index = 0;
    #pragma unroll
-   for(int i = 0; i < 8; i++) {
-      index += ((uint32_t *) hash)[i];
+   for(int i = 0; i < 8; i+=4) {
+      index += hash[i] + hash[i+1] + hash[i+2] + hash[i+3];
    }
 
    return index & 0xfffff; // equivalent to index % MAP
@@ -340,12 +340,10 @@ __kernel void cl_find_peach(uint32_t threads, __global uint8_t *g_map,
       //sm %= MAP;
       sm &= 0xfffff; // equivalent to sm %= MAP
 
-      uint32_t sm_chain[JUMP];
       /* make <JUMP> tile jumps to find the final tile */
       #pragma unroll
       for(int j = 0; j < JUMP; j++) {
         sm = cl_next_index(sm, g_map, nonce, scratch);
-	sm_chain[j] = sm;
       }
 
       /****************************************************************/
@@ -425,38 +423,39 @@ uint32_t cl_fp_operation_transform_inner(uint8_t *data, uint32_t index, uint32_t
 	 * #3) if(data[i ... determine the sign of the operand
 	 *                   ^must always be performed after #2) */
 	uint d7 = udata[0] & 7;
-	if (d7 == 0) {
-		op += udata[1];
-		operand = udata[2];
-		if(udata[3] & 1) operand ^= 0x80000000;
-	} else if (d7 == 1) {
-		op += udata[3];
-		operand = udata[1];
-		if(udata[2] & 1) operand ^= 0x80000000;
-	} else if (d7 == 2) {
+	uchar op0 = (d7 == 2) | (d7 == 3);
+	uchar op1 = (d7 == 0) | (d7 == 6);
+	uchar op2 = (d7 == 5) | (d7 == 7);
+	uchar op3 = (d7 == 1) | (d7 == 4);
+	if (op0) {
 		op += udata[0];
-		operand = udata[2];
-		if(udata[3] & 1) operand ^= 0x80000000;
-	} else if (d7 == 3) {
-		op += udata[0];
-		operand = udata[1];
-		if(udata[2] & 1) operand ^= 0x80000000;
-	} else if (d7 == 4) {
-		op += udata[3];
-		operand = udata[0];
-		if(udata[1] & 1) operand ^= 0x80000000;
-	} else if (d7 == 5) {
-		op += udata[2];
-		operand = udata[0];
-		if(udata[1] & 1) operand ^= 0x80000000;
-	} else if (d7 == 6) {
+	} else if (op1) {
 		op += udata[1];
-		operand = udata[1];
-		if(udata[3] & 1) operand ^= 0x80000000;
-	} else if (d7 == 7) {
+	} else if (op2) {
 		op += udata[2];
+	} else if (op3) {
+		op += udata[3];
+	}
+	uchar oper0 = (d7 == 4) | (d7 == 5);
+	uchar oper1 = (d7 == 1) | (d7 == 3) | (d7 == 6) | (d7 == 7);
+	uchar oper2 = (d7 == 0) | (d7 == 2);
+	if (oper0) {
+		operand = udata[0];
+	} else if (oper1) {
 		operand = udata[1];
-		if(udata[3] & 1) operand ^= 0x80000000;
+	} else if (oper2) {
+		operand = udata[2];
+	}
+	//uchar sign1 = (d7 == 4) | (d7 == 5);
+	uchar sign1 = oper0;
+	uchar sign2 = (d7 == 1) | (d7 == 3);
+	uchar sign3 = (d7 == 0) | (d7 == 2) | (d7 == 6) | (d7 == 7);
+	if (sign1 && (udata[1] & 1)) {
+		operand ^= 0x80000000;
+	} else if (sign2 && (udata[2] & 1)) {
+		operand ^= 0x80000000;
+	} else if (sign3 && (udata[3] & 1)) {
+		operand ^= 0x80000000;
 	}
 
 	/* Cast operand to float */
@@ -482,9 +481,7 @@ uint32_t cl_fp_operation_transform_inner(uint8_t *data, uint32_t index, uint32_t
 
 	/* Add result of floating point operation to op */
 	uint8_t *temp = (uint8_t *) floatp;
-	for (int j = 0; j < 4; j++) {
-		op += temp[j];
-	}
+	op += temp[0] + temp[1] + temp[2] + temp[3];
 
 	((uint*)(data))[0] = ((uint*)udata)[0];
 
@@ -613,9 +610,7 @@ uint32_t cl_fp_operation_notransform_1060B(uint8_t *data, uint32_t index) {
       /* Add result of floating point operation to op */
       uint utemp = as_uint(floatv1);
       uchar *temp = (uchar*)&utemp;
-      for (int j = 0; j < 4; j++) {
-         op += temp[j];
-      }
+      op += temp[0] + temp[1] + temp[2] + temp[3];
    } /* end for(*op = 0... */
    return op;
 }

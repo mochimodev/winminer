@@ -156,6 +156,7 @@ int count_devices_cl() {
 		printf("Device %d: %s %s %u MB\n", i, vendor, name, (unsigned int)(mem_size / 1024 / 1024));
 	}
 
+	if (num_devices > 1) num_devices = 1;
 	return num_devices;
 }
 
@@ -182,7 +183,7 @@ int trigg_init_cl(uint8_t  difficulty, uint8_t *blockNumber) {
 		cl_program prog_md2 = opencl_compile_source(ctx[i].context, 1, &device_id[i], "../crypto/hash/opencl/cl_md2.cl", "-cl-fp32-correctly-rounded-divide-sqrt");
 		cl_program prog_keccak = opencl_compile_source(ctx[i].context, 1, &device_id[i], "../crypto/hash/opencl/cl_keccak.cl", "-cl-fp32-correctly-rounded-divide-sqrt");
 		cl_program prog_blake2b = opencl_compile_source(ctx[i].context, 1, &device_id[i], "../crypto/hash/opencl/cl_blake2b.cl", "-cl-fp32-correctly-rounded-divide-sqrt");
-		cl_program prog_peach = opencl_compile_source(ctx[i].context, 1, &device_id[i], "../algo/peach/cl_peach.cl", "-cl-fp32-correctly-rounded-divide-sqrt");
+		cl_program prog_peach = opencl_compile_source(ctx[i].context, 1, &device_id[i], "../algo/peach/cl_peach.cl", "-cl-fp32-correctly-rounded-divide-sqrt -O0");
 		cl_program prog_parts[] = {prog_peach, prog_md5, prog_sha1, prog_sha256, prog_md2, prog_keccak, prog_blake2b};
 		cl_program prog = clLinkProgram(ctx[i].context, 1, &device_id[i], NULL, 7, prog_parts, NULL, NULL, &err);
 		if (CL_SUCCESS != err) {
