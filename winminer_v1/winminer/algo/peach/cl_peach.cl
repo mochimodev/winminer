@@ -163,7 +163,7 @@ uint32_t cl_next_index(uint32_t index, __global uint8_t *g_map, uint8_t *nonce, 
 	   cl_nighthash_update(&nighthash, seed, seedlen);
 
 	   /* Finalize nighthash into the first 32 byte chunk of the tile */
-	   cl_nighthash_final(&nighthash, hash);
+	   cl_nighthash_final(&nighthash, (uint8_t*)hash);
    }
 
    /* Convert 32-byte Hash Value Into 8x 32-bit Unsigned Integer */
@@ -431,49 +431,50 @@ uint32_t cl_fp_operation_transform_32B(uint8_t *data, uint32_t index) {
    
    /* Work on data 4 bytes at a time */
 #pragma unroll 16
-   for(i = 0; i < adjustedlen; i += 4)
-   {
+   for(i = 0; i < adjustedlen; i += 4) {
+      uchar udata[4];
+      ((uint*)udata)[0] = ((uint*)(data+i))[0];
       /* Cast 4 byte piece to float pointer */
-         floatp = (float *) &data[i];
+      floatp = (float*)udata;
 
       /* 4 byte separation order depends on initial byte:
        * #1) *op = data... determine floating point operation type
        * #2) operand = ... determine the value of the operand
        * #3) if(data[i ... determine the sign of the operand
        *                   ^must always be performed after #2) */
-      uint d7 = data[i] & 7;
+      uint d7 = udata[0] & 7;
       if (d7 == 0) {
-            op += data[i + 1];
-            operand = data[i + 2];
-            if(data[i + 3] & 1) operand ^= 0x80000000;
+            op += udata[1];
+            operand = udata[2];
+            if(udata[3] & 1) operand ^= 0x80000000;
       } else if (d7 == 1) {
-            operand = data[i + 1];
-            if(data[i + 2] & 1) operand ^= 0x80000000;
-            op += data[i + 3];
+            operand = udata[1];
+            if(udata[2] & 1) operand ^= 0x80000000;
+            op += udata[3];
       } else if (d7 == 2) {
-            op += data[i];
-            operand = data[i + 2];
-            if(data[i + 3] & 1) operand ^= 0x80000000;
+            op += udata[0];
+            operand = udata[2];
+            if(udata[3] & 1) operand ^= 0x80000000;
       } else if (d7 == 3) {
-            op += data[i];
-            operand = data[i + 1];
-            if(data[i + 2] & 1) operand ^= 0x80000000;
+            op += udata[0];
+            operand = udata[1];
+            if(udata[2] & 1) operand ^= 0x80000000;
       } else if (d7 == 4) {
-            operand = data[i];
-            if(data[i + 1] & 1) operand ^= 0x80000000;
-            op += data[i + 3];
+            operand = udata[0];
+            if(udata[1] & 1) operand ^= 0x80000000;
+            op += udata[3];
       } else if (d7 == 5) {
-            operand = data[i];
-            if(data[i + 1] & 1) operand ^= 0x80000000;
-            op += data[i + 2];
+            operand = udata[0];
+            if(udata[1] & 1) operand ^= 0x80000000;
+            op += udata[2];
       } else if (d7 == 6) {
-            op += data[i + 1];
-            operand = data[i + 1];
-            if(data[i + 3] & 1) operand ^= 0x80000000;
+            op += udata[1];
+            operand = udata[1];
+            if(udata[3] & 1) operand ^= 0x80000000;
       } else if (d7 == 7) {
-            operand = data[i + 1];
-            op += data[i + 2];
-            if(data[i + 3] & 1) operand ^= 0x80000000;
+            operand = udata[1];
+            op += udata[2];
+            if(udata[3] & 1) operand ^= 0x80000000;
       }
 
       /* Cast operand to float */
@@ -502,6 +503,8 @@ uint32_t cl_fp_operation_transform_32B(uint8_t *data, uint32_t index) {
       for(j = 0; j < 4; j++) {
          op += temp[j];
       }
+
+      ((uint*)(data+i))[0] = ((uint*)udata)[0];
    } /* end for(*op = 0... */
    return op;
 }
@@ -515,49 +518,50 @@ uint32_t cl_fp_operation_transform_36B(uint8_t *data, uint32_t index) {
    
    /* Work on data 4 bytes at a time */
 #pragma unroll 18
-   for(i = 0; i < adjustedlen; i += 4)
-   {
+   for(i = 0; i < adjustedlen; i += 4) {
+      uchar udata[4];
+      ((uint*)udata)[0] = ((uint*)(data+i))[0];
       /* Cast 4 byte piece to float pointer */
-         floatp = (float *) &data[i];
+      floatp = (float*)udata;
 
       /* 4 byte separation order depends on initial byte:
        * #1) op = data... determine floating point operation type
        * #2) operand = ... determine the value of the operand
        * #3) if(data[i ... determine the sign of the operand
        *                   ^must always be performed after #2) */
-      uint d7 = data[i] & 7;
+      uint d7 = udata[0] & 7;
       if (d7 == 0) {
-            op += data[i + 1];
-            operand = data[i + 2];
-            if(data[i + 3] & 1) operand ^= 0x80000000;
+            op += udata[1];
+            operand = udata[2];
+            if(udata[3] & 1) operand ^= 0x80000000;
       } else if (d7 == 1) {
-            operand = data[i + 1];
-            if(data[i + 2] & 1) operand ^= 0x80000000;
-            op += data[i + 3];
+            operand = udata[1];
+            if(udata[2] & 1) operand ^= 0x80000000;
+            op += udata[3];
       } else if (d7 == 2) {
-            op += data[i];
-            operand = data[i + 2];
-            if(data[i + 3] & 1) operand ^= 0x80000000;
+            op += udata[0];
+            operand = udata[2];
+            if(udata[3] & 1) operand ^= 0x80000000;
       } else if (d7 == 3) {
-            op += data[i];
-            operand = data[i + 1];
-            if(data[i + 2] & 1) operand ^= 0x80000000;
+            op += udata[0];
+            operand = udata[1];
+            if(udata[2] & 1) operand ^= 0x80000000;
       } else if (d7 == 4) {
-            operand = data[i];
-            if(data[i + 1] & 1) operand ^= 0x80000000;
-            op += data[i + 3];
+            operand = udata[0];
+            if(udata[1] & 1) operand ^= 0x80000000;
+            op += udata[3];
       } else if (d7 == 5) {
-            operand = data[i];
-            if(data[i + 1] & 1) operand ^= 0x80000000;
-            op += data[i + 2];
+            operand = udata[0];
+            if(udata[1] & 1) operand ^= 0x80000000;
+            op += udata[2];
       } else if (d7 == 6) {
-            op += data[i + 1];
-            operand = data[i + 1];
-            if(data[i + 3] & 1) operand ^= 0x80000000;
+            op += udata[1];
+            operand = udata[1];
+            if(udata[3] & 1) operand ^= 0x80000000;
       } else if (d7 == 7) {
-            operand = data[i + 1];
-            op += data[i + 2];
-            if(data[i + 3] & 1) operand ^= 0x80000000;
+            operand = udata[1];
+            op += udata[2];
+            if(udata[3] & 1) operand ^= 0x80000000;
       }
 
       /* Cast operand to float */
@@ -586,6 +590,8 @@ uint32_t cl_fp_operation_transform_36B(uint8_t *data, uint32_t index) {
       for(j = 0; j < 4; j++) {
          op += temp[j];
       }
+
+      ((uint*)(data+i))[0] = ((uint*)udata)[0];
    } /* end for(*op = 0... */
    return op;
 }
@@ -608,11 +614,8 @@ uint32_t cl_fp_operation_notransform_1060B(uint8_t *data, uint32_t index) {
    /* Work on data 4 bytes at a time */
 #pragma unroll 10
    for(i = 0; i < adjustedlen; i += 4) {
-	uchar udata[4];
-	udata[0] = data[i];
-	udata[1] = data[i+1];
-	udata[2] = data[i+2];
-	udata[3] = data[i+3];
+      uchar udata[4];
+      ((uint*)udata)[0] = ((uint*)(data+i))[0];
       /* Cast 4 byte piece to float pointer */
         // floatv1 = *(float *) &data[i];
       floatv1 = as_float(*((uint*)(udata)));
