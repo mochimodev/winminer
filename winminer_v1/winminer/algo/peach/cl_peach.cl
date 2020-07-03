@@ -422,8 +422,9 @@ __kernel void cl_find_peach(uint32_t threads, __global uint8_t *g_map,
  * @param index     - the current tile
  * @param *op       - pointer to the operator value
  * @param transform - flag indicates to transform the input data */
-void cl_fp_operation_transform_32B(uint8_t *data, uint32_t index, uint32_t *op) {
+uint32_t cl_fp_operation_transform_32B(uint8_t *data, uint32_t index) {
    const uint32_t adjustedlen = 32;
+   uint32_t op = 0;
    int32_t i, j, operand;
    float floatv, floatv1;
    float *floatp;
@@ -442,36 +443,36 @@ void cl_fp_operation_transform_32B(uint8_t *data, uint32_t index, uint32_t *op) 
        *                   ^must always be performed after #2) */
       uint d7 = data[i] & 7;
       if (d7 == 0) {
-            *op += data[i + 1];
+            op += data[i + 1];
             operand = data[i + 2];
             if(data[i + 3] & 1) operand ^= 0x80000000;
       } else if (d7 == 1) {
             operand = data[i + 1];
             if(data[i + 2] & 1) operand ^= 0x80000000;
-            *op += data[i + 3];
+            op += data[i + 3];
       } else if (d7 == 2) {
-            *op += data[i];
+            op += data[i];
             operand = data[i + 2];
             if(data[i + 3] & 1) operand ^= 0x80000000;
       } else if (d7 == 3) {
-            *op += data[i];
+            op += data[i];
             operand = data[i + 1];
             if(data[i + 2] & 1) operand ^= 0x80000000;
       } else if (d7 == 4) {
             operand = data[i];
             if(data[i + 1] & 1) operand ^= 0x80000000;
-            *op += data[i + 3];
+            op += data[i + 3];
       } else if (d7 == 5) {
             operand = data[i];
             if(data[i + 1] & 1) operand ^= 0x80000000;
-            *op += data[i + 2];
+            op += data[i + 2];
       } else if (d7 == 6) {
-            *op += data[i + 1];
+            op += data[i + 1];
             operand = data[i + 1];
             if(data[i + 3] & 1) operand ^= 0x80000000;
       } else if (d7 == 7) {
             operand = data[i + 1];
-            *op += data[i + 2];
+            op += data[i + 2];
             if(data[i + 3] & 1) operand ^= 0x80000000;
       }
 
@@ -482,7 +483,7 @@ void cl_fp_operation_transform_32B(uint8_t *data, uint32_t index, uint32_t *op) 
       if(isnan(*floatp)) *floatp = index;
 
       /* Perform predetermined floating point operation */
-      uint lop = *op & 3;
+      uint lop = op & 3;
       if (lop == 0) {
             *floatp += floatv;
       } else if (lop == 1) {
@@ -499,13 +500,15 @@ void cl_fp_operation_transform_32B(uint8_t *data, uint32_t index, uint32_t *op) 
       /* Add result of floating point operation to op */
       uint8_t *temp = (uint8_t *) floatp;
       for(j = 0; j < 4; j++) {
-         *op += temp[j];
+         op += temp[j];
       }
    } /* end for(*op = 0... */
+   return op;
 }
 
-void cl_fp_operation_transform_36B(uint8_t *data, uint32_t index, uint32_t *op) {
+uint32_t cl_fp_operation_transform_36B(uint8_t *data, uint32_t index) {
    const uint32_t adjustedlen = 36;
+   uint32_t op = 0;
    int32_t i, j, operand;
    float floatv;
    float *floatp;
@@ -518,42 +521,42 @@ void cl_fp_operation_transform_36B(uint8_t *data, uint32_t index, uint32_t *op) 
          floatp = (float *) &data[i];
 
       /* 4 byte separation order depends on initial byte:
-       * #1) *op = data... determine floating point operation type
+       * #1) op = data... determine floating point operation type
        * #2) operand = ... determine the value of the operand
        * #3) if(data[i ... determine the sign of the operand
        *                   ^must always be performed after #2) */
       uint d7 = data[i] & 7;
       if (d7 == 0) {
-            *op += data[i + 1];
+            op += data[i + 1];
             operand = data[i + 2];
             if(data[i + 3] & 1) operand ^= 0x80000000;
       } else if (d7 == 1) {
             operand = data[i + 1];
             if(data[i + 2] & 1) operand ^= 0x80000000;
-            *op += data[i + 3];
+            op += data[i + 3];
       } else if (d7 == 2) {
-            *op += data[i];
+            op += data[i];
             operand = data[i + 2];
             if(data[i + 3] & 1) operand ^= 0x80000000;
       } else if (d7 == 3) {
-            *op += data[i];
+            op += data[i];
             operand = data[i + 1];
             if(data[i + 2] & 1) operand ^= 0x80000000;
       } else if (d7 == 4) {
             operand = data[i];
             if(data[i + 1] & 1) operand ^= 0x80000000;
-            *op += data[i + 3];
+            op += data[i + 3];
       } else if (d7 == 5) {
             operand = data[i];
             if(data[i + 1] & 1) operand ^= 0x80000000;
-            *op += data[i + 2];
+            op += data[i + 2];
       } else if (d7 == 6) {
-            *op += data[i + 1];
+            op += data[i + 1];
             operand = data[i + 1];
             if(data[i + 3] & 1) operand ^= 0x80000000;
       } else if (d7 == 7) {
             operand = data[i + 1];
-            *op += data[i + 2];
+            op += data[i + 2];
             if(data[i + 3] & 1) operand ^= 0x80000000;
       }
 
@@ -564,7 +567,7 @@ void cl_fp_operation_transform_36B(uint8_t *data, uint32_t index, uint32_t *op) 
       if(isnan(*floatp)) *floatp = index;
 
       /* Perform predetermined floating point operation */
-      uint lop = *op & 3;
+      uint lop = op & 3;
       if (lop == 0) {
             *floatp += floatv;
       } else if (lop == 1) {
@@ -581,9 +584,10 @@ void cl_fp_operation_transform_36B(uint8_t *data, uint32_t index, uint32_t *op) 
       /* Add result of floating point operation to op */
       uint8_t *temp = (uint8_t *) floatp;
       for(j = 0; j < 4; j++) {
-         *op += temp[j];
+         op += temp[j];
       }
    } /* end for(*op = 0... */
+   return op;
 }
 
 /**
@@ -595,9 +599,9 @@ void cl_fp_operation_transform_36B(uint8_t *data, uint32_t index, uint32_t *op) 
  * @param index     - the current tile
  * @param *op       - pointer to the operator value
  * @param transform - flag indicates to transform the input data */
-uint32_t cl_fp_operation_notransform_1060B(uint8_t *data, uint32_t index, uint32_t op)
-{
+uint32_t cl_fp_operation_notransform_1060B(uint8_t *data, uint32_t index) {
    const uint32_t adjustedlen = 1060;
+   uint32_t op = 0;
    int32_t i, j, operand;
    float floatv, floatv1;
    
@@ -740,55 +744,35 @@ uint32_t cl_bitbyte_transform(uint8_t *data, uint32_t len, uint32_t op)
    return op;
 }
 
-void cl_nighthash_init_common(CUDA_NIGHTHASH_CTX *ctx, uint32_t algo_type) {
-	/* Clear nighthash context */
-	/*for (int i = 0; i < sizeof(CUDA_NIGHTHASH_CTX); i++) {
-		((uint8_t*)ctx)[i] = 0;
-	}*/
-#pragma unroll
-	for (int i = 0; i < sizeof(CUDA_NIGHTHASH_CTX)/8; i++) {
-		((uint64_t*)ctx)[i] = 0;
-	}
-
-	ctx->algo_type = algo_type & 7;
-}
-
 void cl_nighthash_init_transform_32B(CUDA_NIGHTHASH_CTX *ctx, uint8_t *algo_type_seed, uint32_t index) {
-	uint32_t algo_type = 0;
-
 	/* Perform floating point operations to transform (if transform byte is set)
 	 * input data and determine algo type */
-	cl_fp_operation_transform_32B(algo_type_seed, index, &algo_type);
+	uint32_t algo_type = cl_fp_operation_transform_32B(algo_type_seed, index);
 
 	/* Perform bit/byte transform operations to transform (if transform byte is set)
 	 * input data and determine algo type */
 	algo_type = cl_bitbyte_transform(algo_type_seed, 32, algo_type);
 
-	cl_nighthash_init_common(ctx, algo_type);
+	ctx->algo_type = algo_type & 7;
 }
 
 void cl_nighthash_init_transform_36B(CUDA_NIGHTHASH_CTX *ctx, uint8_t *algo_type_seed, uint32_t index) {
-	uint32_t algo_type = 0;
-
 	/* Perform floating point operations to transform (if transform byte is set)
 	 * input data and determine algo type */
-	cl_fp_operation_transform_36B(algo_type_seed, index, &algo_type);
+	uint32_t algo_type = cl_fp_operation_transform_36B(algo_type_seed, index);
 
 	/* Perform bit/byte transform operations to transform (if transform byte is set)
 	 * input data and determine algo type */
 	algo_type = cl_bitbyte_transform(algo_type_seed, 36, algo_type);
 
-	cl_nighthash_init_common(ctx, algo_type);
+	ctx->algo_type = algo_type & 7;
 }
 
 void cl_nighthash_init_notransform_1060B(CUDA_NIGHTHASH_CTX *ctx, uint8_t *algo_type_seed, uint32_t index) {
-	uint32_t algo_type = 0;
-
 	/* Perform floating point operations to transform (if transform byte is set)
 	 * input data and determine algo type */
-	algo_type = cl_fp_operation_notransform_1060B(algo_type_seed, index, algo_type);
-
-	cl_nighthash_init_common(ctx, algo_type);
+	uint32_t algo_type = cl_fp_operation_notransform_1060B(algo_type_seed, index);
+	ctx->algo_type = algo_type & 7;
 }
 
 void cl_nighthash_algoinit(CUDA_NIGHTHASH_CTX *ctx) {
