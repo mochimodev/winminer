@@ -453,13 +453,13 @@ if (n>=c_difficulty) {
  * @param transform - flag indicates to transform the input data */
 void cl_fp_operation_transform_32B(uint8_t *data, uint32_t index, uint32_t *op) {
    uint8_t *temp;
-   uint32_t adjustedlen = 32;
+   const const uint32_t adjustedlen = 32;
    int32_t i, j, operand;
    float floatv, floatv1;
    float *floatp;
    
    /* Work on data 4 bytes at a time */
-#pragma unroll
+#pragma unroll 16
    for(i = 0; i < adjustedlen; i += 4)
    {
       /* Cast 4 byte piece to float pointer */
@@ -533,15 +533,16 @@ void cl_fp_operation_transform_32B(uint8_t *data, uint32_t index, uint32_t *op) 
       }
    } /* end for(*op = 0... */
 }
+
 void cl_fp_operation_transform_36B(uint8_t *data, uint32_t index, uint32_t *op) {
    uint8_t *temp;
-   uint32_t adjustedlen = 36;
+   const uint32_t adjustedlen = 36;
    int32_t i, j, operand;
    float floatv;
    float *floatp;
    
    /* Work on data 4 bytes at a time */
-#pragma unroll
+#pragma unroll 18
    for(i = 0; i < adjustedlen; i += 4)
    {
       /* Cast 4 byte piece to float pointer */
@@ -632,7 +633,7 @@ uint32_t cl_fp_operation_notransform_1060B(uint8_t *data, uint32_t index, uint32
    float floatv, floatv1;
    
    /* Work on data 4 bytes at a time */
-#pragma unroll
+#pragma unroll 10
    for(i = 0; i < adjustedlen; i += 4) {
 	uchar udata[4];
 	udata[0] = data[i];
@@ -770,77 +771,7 @@ uint32_t cl_bitbyte_transform(uint8_t *data, uint32_t len, uint32_t op)
    return op;
 }
 
-void cl_nighthash_init_transform_32B(CUDA_NIGHTHASH_CTX *ctx, uint8_t *algo_type_seed, uint32_t index) {
-	uint32_t algo_type;
-	algo_type = 0;
-
-	/* Perform floating point operations to transform (if transform byte is set)
-	 * input data and determine algo type */
-	cl_fp_operation_transform_32B(algo_type_seed, index, &algo_type);
-
-	/* Perform bit/byte transform operations to transform (if transform byte is set)
-	 * input data and determine algo type */
-	algo_type = cl_bitbyte_transform(algo_type_seed, 32, algo_type);
-
-	/* Clear nighthash context */
-	for (int i = 0; i < sizeof(CUDA_NIGHTHASH_CTX); i++) {
-		((uint8_t*)ctx)[i] = 0;
-	}
-
-	ctx->algo_type = algo_type & 7;
-
-	switch(ctx->algo_type)
-	{
-		case 6:
-			cl_md2_init(&(ctx->md2));
-			break;
-		case 7:
-			cl_md5_init(&(ctx->md5));
-			break;
-		default:
-			break;
-	} /* end switch(algo_type)... */
-}
-void cl_nighthash_init_transform_36B(CUDA_NIGHTHASH_CTX *ctx, uint8_t *algo_type_seed, uint32_t index) {
-	uint32_t algo_type;
-	algo_type = 0;
-
-	/* Perform floating point operations to transform (if transform byte is set)
-	 * input data and determine algo type */
-	cl_fp_operation_transform_36B(algo_type_seed, index, &algo_type);
-
-	/* Perform bit/byte transform operations to transform (if transform byte is set)
-	 * input data and determine algo type */
-	algo_type = cl_bitbyte_transform(algo_type_seed, 36, algo_type);
-
-	/* Clear nighthash context */
-	for (int i = 0; i < sizeof(CUDA_NIGHTHASH_CTX); i++) {
-		((uint8_t*)ctx)[i] = 0;
-	}
-
-	ctx->algo_type = algo_type & 7;
-
-	switch(ctx->algo_type)
-	{
-		case 6:
-			cl_md2_init(&(ctx->md2));
-			break;
-		case 7:
-			cl_md5_init(&(ctx->md5));
-			break;
-		default:
-			break;
-	} /* end switch(algo_type)... */
-}
-
-void cl_nighthash_init_notransform_1060B(CUDA_NIGHTHASH_CTX *ctx, uint8_t *algo_type_seed, uint32_t index) {
-	uint32_t algo_type;
-	algo_type = 0;
-
-	/* Perform floating point operations to transform (if transform byte is set)
-	 * input data and determine algo type */
-	algo_type = cl_fp_operation_notransform_1060B(algo_type_seed, index, algo_type);
-
+void cl_nighthash_init_common(CUDA_NIGHTHASH_CTX *ctx, uint32_t algo_type) {
 	/* Clear nighthash context */
 	for (int i = 0; i < sizeof(CUDA_NIGHTHASH_CTX); i++) {
 		((uint8_t*)ctx)[i] = 0;
@@ -854,6 +785,48 @@ void cl_nighthash_init_notransform_1060B(CUDA_NIGHTHASH_CTX *ctx, uint8_t *algo_
 		cl_md5_init(&(ctx->md5));
 	}
 }
+
+void cl_nighthash_init_transform_32B(CUDA_NIGHTHASH_CTX *ctx, uint8_t *algo_type_seed, uint32_t index) {
+	uint32_t algo_type;
+	algo_type = 0;
+
+	/* Perform floating point operations to transform (if transform byte is set)
+	 * input data and determine algo type */
+	cl_fp_operation_transform_32B(algo_type_seed, index, &algo_type);
+
+	/* Perform bit/byte transform operations to transform (if transform byte is set)
+	 * input data and determine algo type */
+	algo_type = cl_bitbyte_transform(algo_type_seed, 32, algo_type);
+
+	cl_nighthash_init_common(ctx, algo_type);
+}
+
+void cl_nighthash_init_transform_36B(CUDA_NIGHTHASH_CTX *ctx, uint8_t *algo_type_seed, uint32_t index) {
+	uint32_t algo_type;
+	algo_type = 0;
+
+	/* Perform floating point operations to transform (if transform byte is set)
+	 * input data and determine algo type */
+	cl_fp_operation_transform_36B(algo_type_seed, index, &algo_type);
+
+	/* Perform bit/byte transform operations to transform (if transform byte is set)
+	 * input data and determine algo type */
+	algo_type = cl_bitbyte_transform(algo_type_seed, 36, algo_type);
+
+	cl_nighthash_init_common(ctx, algo_type);
+}
+
+void cl_nighthash_init_notransform_1060B(CUDA_NIGHTHASH_CTX *ctx, uint8_t *algo_type_seed, uint32_t index) {
+	uint32_t algo_type;
+	algo_type = 0;
+
+	/* Perform floating point operations to transform (if transform byte is set)
+	 * input data and determine algo type */
+	algo_type = cl_fp_operation_notransform_1060B(algo_type_seed, index, algo_type);
+
+	cl_nighthash_init_common(ctx, algo_type);
+}
+
 
 void cl_nighthash_update(CUDA_NIGHTHASH_CTX *ctx, uint8_t *in, uint32_t inlen) {
 	if (ctx->algo_type == 6) {
