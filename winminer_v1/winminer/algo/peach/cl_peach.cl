@@ -89,10 +89,9 @@ typedef struct {
 } CUDA_NIGHTHASH_CTX;
 
 uint8_t *trigg_gen(uint8_t *in);
-void cl_nighthash_init_transform(CUDA_NIGHTHASH_CTX *ctx, uint8_t *algo_type_seed,
-                                    uint32_t algo_type_seed_length, uint32_t index);
-void cl_nighthash_init_notransform(CUDA_NIGHTHASH_CTX *ctx, uint8_t *algo_type_seed,
-                                    uint32_t algo_type_seed_length, uint32_t index);
+void cl_nighthash_init_transform_32B(CUDA_NIGHTHASH_CTX *ctx, uint8_t *algo_type_seed, uint32_t index);
+void cl_nighthash_init_transform_36B(CUDA_NIGHTHASH_CTX *ctx, uint8_t *algo_type_seed, uint32_t index);
+void cl_nighthash_init_notransform_1060B(CUDA_NIGHTHASH_CTX *ctx, uint8_t *algo_type_seed, uint32_t index);
 void cl_nighthash_update(CUDA_NIGHTHASH_CTX *ctx, uint8_t *in, uint32_t inlen);
 void cl_nighthash_final(CUDA_NIGHTHASH_CTX *ctx, uint8_t *out);
 void SHA2_256_36B(uint *Digest, const uint *InData);
@@ -156,7 +155,7 @@ uint32_t cl_next_index(uint32_t index, __global uint8_t *g_map, uint8_t *nonce, 
 #endif
    
    /* Setup nighthash the seed, NO TRANSFORM */
-   cl_nighthash_init_notransform(&nighthash, seed, seedlen, index);
+   cl_nighthash_init_notransform_1060B(&nighthash, seed, index);
 
    if (nighthash.algo_type == 0) {
 	   Blake2B_K32_1060B((uchar*)hash, (uchar*)seed);
@@ -211,7 +210,7 @@ void cl_gen_tile(uint32_t index, __global uint8_t *g_map, uint8_t debug, __globa
     }
 
    /* Setup nighthash with a transform of the seed */
-   cl_nighthash_init_transform(&nighthash, seed, seedlen, index);
+   cl_nighthash_init_transform_36B(&nighthash, seed, index);
 
    if (nighthash.algo_type == 0) {
 	   Blake2B_K32_36B((uchar*)local_out, (uchar*)seed);
@@ -245,7 +244,7 @@ void cl_gen_tile(uint32_t index, __global uint8_t *g_map, uint8_t debug, __globa
    for(i = 0, j = HASHLEN; j < TILE_LENGTH; i += HASHLEN, j += HASHLEN) { /* For each tile row */
 	   /* Hash the current row to the next, if not at the end */
 	   /* Setup nighthash with a transform of the current row */
-	   cl_nighthash_init_transform(&nighthash, local_out, HASHLEN, index);
+	   cl_nighthash_init_transform_32B(&nighthash, local_out, index);
 	   for (int z = 0; z < HASHLEN; z++) {
 		   tilep[i+z] = local_out[z];
 	   }
@@ -452,18 +451,95 @@ if (n>=c_difficulty) {
  * @param index     - the current tile
  * @param *op       - pointer to the operator value
  * @param transform - flag indicates to transform the input data */
-void cl_fp_operation_transform(uint8_t *data, uint32_t len, uint32_t index,
-                                  uint32_t *op)
-{
+void cl_fp_operation_transform_32B(uint8_t *data, uint32_t index, uint32_t *op) {
    uint8_t *temp;
-   uint32_t adjustedlen;
+   uint32_t adjustedlen = 32;
    int32_t i, j, operand;
    float floatv, floatv1;
    float *floatp;
    
-   /* Adjust the length to a multiple of 4 */
-   adjustedlen = len & 0xfffffffc;
+   /* Work on data 4 bytes at a time */
+#pragma unroll
+   for(i = 0; i < adjustedlen; i += 4)
+   {
+      /* Cast 4 byte piece to float pointer */
+         floatp = (float *) &data[i];
 
+      /* 4 byte separation order depends on initial byte:
+       * #1) *op = data... determine floating point operation type
+       * #2) operand = ... determine the value of the operand
+       * #3) if(data[i ... determine the sign of the operand
+       *                   ^must always be performed after #2) */
+      uint d7 = data[i] & 7;
+      if (d7 == 0) {
+            *op += data[i + 1];
+            operand = data[i + 2];
+            if(data[i + 3] & 1) operand ^= 0x80000000;
+      } else if (d7 == 1) {
+            operand = data[i + 1];
+            if(data[i + 2] & 1) operand ^= 0x80000000;
+            *op += data[i + 3];
+      } else if (d7 == 2) {
+            *op += data[i];
+            operand = data[i + 2];
+            if(data[i + 3] & 1) operand ^= 0x80000000;
+      } else if (d7 == 3) {
+            *op += data[i];
+            operand = data[i + 1];
+            if(data[i + 2] & 1) operand ^= 0x80000000;
+      } else if (d7 == 4) {
+            operand = data[i];
+            if(data[i + 1] & 1) operand ^= 0x80000000;
+            *op += data[i + 3];
+      } else if (d7 == 5) {
+            operand = data[i];
+            if(data[i + 1] & 1) operand ^= 0x80000000;
+            *op += data[i + 2];
+      } else if (d7 == 6) {
+            *op += data[i + 1];
+            operand = data[i + 1];
+            if(data[i + 3] & 1) operand ^= 0x80000000;
+      } else if (d7 == 7) {
+            operand = data[i + 1];
+            *op += data[i + 2];
+            if(data[i + 3] & 1) operand ^= 0x80000000;
+      }
+
+      /* Cast operand to float */
+      floatv = operand;
+
+      /* Replace pre-operation NaN with index */
+      if(isnan(*floatp)) *floatp = index;
+
+      /* Perform predetermined floating point operation */
+      uint lop = *op & 3;
+      if (lop == 0) {
+            *floatp += floatv;
+      } else if (lop == 1) {
+            *floatp -= floatv;
+      } else if (lop == 2) {
+            *floatp *= floatv;
+      } else if (lop == 3) {
+            *floatp /= floatv;
+      }
+
+      /* Replace post-operation NaN with index */
+      if(isnan(*floatp)) *floatp = index;
+
+      /* Add result of floating point operation to op */
+      temp = (uint8_t *) floatp;
+      for(j = 0; j < 4; j++) {
+         *op += temp[j];
+      }
+   } /* end for(*op = 0... */
+}
+void cl_fp_operation_transform_36B(uint8_t *data, uint32_t index, uint32_t *op) {
+   uint8_t *temp;
+   uint32_t adjustedlen = 36;
+   int32_t i, j, operand;
+   float floatv;
+   float *floatp;
+   
    /* Work on data 4 bytes at a time */
 #pragma unroll
    for(i = 0; i < adjustedlen; i += 4)
@@ -549,16 +625,12 @@ void cl_fp_operation_transform(uint8_t *data, uint32_t len, uint32_t index,
  * @param index     - the current tile
  * @param *op       - pointer to the operator value
  * @param transform - flag indicates to transform the input data */
-uint32_t cl_fp_operation_notransform(uint8_t *data, uint32_t len, uint32_t index,
-                                  uint32_t op)
+uint32_t cl_fp_operation_notransform_1060B(uint8_t *data, uint32_t index, uint32_t op)
 {
-   uint32_t adjustedlen;
+   const uint32_t adjustedlen = 1060;
    int32_t i, j, operand;
    float floatv, floatv1;
    
-   /* Adjust the length to a multiple of 4 */
-   adjustedlen = len & 0xfffffffc;
-
    /* Work on data 4 bytes at a time */
 #pragma unroll
    for(i = 0; i < adjustedlen; i += 4) {
@@ -600,7 +672,8 @@ uint32_t cl_fp_operation_notransform(uint8_t *data, uint32_t len, uint32_t index
       } else if (oper2) {
 	      operand = udata[2];
       }
-      uchar sign1 = (d7 == 4) | (d7 == 5);
+      //uchar sign1 = (d7 == 4) | (d7 == 5);
+      uchar sign1 = oper0;
       uchar sign2 = (d7 == 1) | (d7 == 3);
       uchar sign3 = (d7 == 0) | (d7 == 2) | (d7 == 6) | (d7 == 7);
       if (sign1 && (udata[1] & 1)) {
@@ -697,18 +770,48 @@ uint32_t cl_bitbyte_transform(uint8_t *data, uint32_t len, uint32_t op)
    return op;
 }
 
-void cl_nighthash_init_transform(CUDA_NIGHTHASH_CTX *ctx, uint8_t *algo_type_seed,
-		uint32_t algo_type_seed_length, uint32_t index) {
+void cl_nighthash_init_transform_32B(CUDA_NIGHTHASH_CTX *ctx, uint8_t *algo_type_seed, uint32_t index) {
 	uint32_t algo_type;
 	algo_type = 0;
 
 	/* Perform floating point operations to transform (if transform byte is set)
 	 * input data and determine algo type */
-	cl_fp_operation_transform(algo_type_seed, algo_type_seed_length, index, &algo_type);
+	cl_fp_operation_transform_32B(algo_type_seed, index, &algo_type);
 
 	/* Perform bit/byte transform operations to transform (if transform byte is set)
 	 * input data and determine algo type */
-	algo_type = cl_bitbyte_transform(algo_type_seed, algo_type_seed_length, algo_type);
+	algo_type = cl_bitbyte_transform(algo_type_seed, 32, algo_type);
+
+	/* Clear nighthash context */
+	for (int i = 0; i < sizeof(CUDA_NIGHTHASH_CTX); i++) {
+		((uint8_t*)ctx)[i] = 0;
+	}
+
+	ctx->algo_type = algo_type & 7;
+
+	switch(ctx->algo_type)
+	{
+		case 6:
+			cl_md2_init(&(ctx->md2));
+			break;
+		case 7:
+			cl_md5_init(&(ctx->md5));
+			break;
+		default:
+			break;
+	} /* end switch(algo_type)... */
+}
+void cl_nighthash_init_transform_36B(CUDA_NIGHTHASH_CTX *ctx, uint8_t *algo_type_seed, uint32_t index) {
+	uint32_t algo_type;
+	algo_type = 0;
+
+	/* Perform floating point operations to transform (if transform byte is set)
+	 * input data and determine algo type */
+	cl_fp_operation_transform_36B(algo_type_seed, index, &algo_type);
+
+	/* Perform bit/byte transform operations to transform (if transform byte is set)
+	 * input data and determine algo type */
+	algo_type = cl_bitbyte_transform(algo_type_seed, 36, algo_type);
 
 	/* Clear nighthash context */
 	for (int i = 0; i < sizeof(CUDA_NIGHTHASH_CTX); i++) {
@@ -730,14 +833,13 @@ void cl_nighthash_init_transform(CUDA_NIGHTHASH_CTX *ctx, uint8_t *algo_type_see
 	} /* end switch(algo_type)... */
 }
 
-void cl_nighthash_init_notransform(CUDA_NIGHTHASH_CTX *ctx, uint8_t *algo_type_seed,
-		uint32_t algo_type_seed_length, uint32_t index) {
+void cl_nighthash_init_notransform_1060B(CUDA_NIGHTHASH_CTX *ctx, uint8_t *algo_type_seed, uint32_t index) {
 	uint32_t algo_type;
 	algo_type = 0;
 
 	/* Perform floating point operations to transform (if transform byte is set)
 	 * input data and determine algo type */
-	algo_type = cl_fp_operation_notransform(algo_type_seed, algo_type_seed_length, index, algo_type);
+	algo_type = cl_fp_operation_notransform_1060B(algo_type_seed, index, algo_type);
 
 	/* Clear nighthash context */
 	for (int i = 0; i < sizeof(CUDA_NIGHTHASH_CTX); i++) {
