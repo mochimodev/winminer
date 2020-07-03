@@ -137,14 +137,14 @@ uint32_t cl_next_index(uint32_t index, __global uint8_t *g_map, uint8_t *nonce, 
    int i = 0;
 
    /* Create nighthash seed for this index on the map */
-    for (int i = 0; i < HASHLEN; i++) {
-	    ((uint8_t*)seed)[i] = nonce[i];
+#pragma unroll
+    for (int i = 0; i < HASHLEN/8; i++) {
+	    ((uint64_t*)seed)[i] = ((uint64_t*)(nonce))[i];
     }
-    for (int i = 0; i < 4; i++) {
-	    ((uint8_t*)(seed+HASHLEN))[i] = ((uint8_t*)&index)[i];
-    }
-    for (int i = 0; i < TILE_LENGTH; i++) {
-	    ((uint8_t*)(seed+HASHLEN+4))[i] = g_map[index*TILE_LENGTH + i];
+   ((uint32_t*)(seed+HASHLEN))[0] = ((uint32_t*)&index)[0];
+#pragma unroll
+    for (int i = 0; i < TILE_LENGTH/4; i++) {
+	    ((uint32_t*)(seed+HASHLEN+4))[i] = ((global uint32_t*)(g_map+index*TILE_LENGTH))[i];
     }
 
 #ifdef DEBUG
@@ -236,8 +236,8 @@ void cl_gen_tile(uint32_t index, __global uint8_t *g_map, uint8_t debug, __globa
 	   cl_nighthash_final(&nighthash, local_out);
    }
 
-   for (int i = 0; i < HASHLEN; i++) {
-	   tilep[i] = local_out[i];
+   for (int i = 0; i < HASHLEN/8; i++) {
+	   ((global uint64_t*)(tilep))[i] = ((uint64_t*)(local_out))[i];
    }
 
    /* Begin constructing the full tile */
@@ -273,8 +273,8 @@ void cl_gen_tile(uint32_t index, __global uint8_t *g_map, uint8_t debug, __globa
 		   cl_nighthash_update(&nighthash, local_out, HASHLEN+4);
 		   cl_nighthash_final(&nighthash, local_out);
 	   }
-	   for (int z = 0; z < HASHLEN; z++) {
-		   tilep[j+z] = local_out[z];
+	   for (int z = 0; z < HASHLEN/8; z++) {
+		   ((global uint64_t*)(tilep+j))[z] = ((uint64_t*)(local_out))[z];
 	   }
    }
 }
@@ -335,8 +335,9 @@ __kernel void cl_find_peach(uint32_t threads, __global uint8_t *g_map,
       /* Hash 124 bytes of Block Trailer, including both seeds */
 
       uint8_t l_input[124];
-      for (int i = 0; i < 108; i++) {
-	      l_input[i] = c_input[i];
+#pragma unroll
+      for (int i = 0; i < 108/4; i++) {
+	      ((uint32_t*)(l_input))[i] = ((global uint32_t*)(c_input))[i];
       }
 #pragma unroll
       for (int i = 0; i < 16; i++) {
@@ -365,13 +366,14 @@ uint32_t sm_chain[JUMP];
       /****************************************************************/
       /* Check the hash of the final tile produces the desired result */
 
-      uint8_t btbuf[HASHLEN+TILE_LENGTH];
+      uint64_t btbuf[HASHLEN+TILE_LENGTH];
 #pragma unroll
-      for (int i = 0; i < HASHLEN; i++) {
-	      btbuf[i] = bt_hash[i];
+      for (int i = 0; i < HASHLEN/8; i++) {
+	      btbuf[i] = ((uint64_t*)bt_hash)[i];
       }
-      for (int i = 0; i < TILE_LENGTH; i++) {
-	      btbuf[HASHLEN+i] = g_map[sm*TILE_LENGTH + i];
+#pragma unroll
+      for (int i = 0; i < TILE_LENGTH/8; i++) {
+	      btbuf[HASHLEN/8+i] = ((global uint64_t*)(g_map+sm*TILE_LENGTH))[i];
       }
       SHA2_256_1056B_1060B((uint*)fhash, (uint*)btbuf, false);
 
@@ -452,8 +454,7 @@ if (n>=c_difficulty) {
  * @param *op       - pointer to the operator value
  * @param transform - flag indicates to transform the input data */
 void cl_fp_operation_transform_32B(uint8_t *data, uint32_t index, uint32_t *op) {
-   uint8_t *temp;
-   const const uint32_t adjustedlen = 32;
+   const uint32_t adjustedlen = 32;
    int32_t i, j, operand;
    float floatv, floatv1;
    float *floatp;
@@ -527,7 +528,7 @@ void cl_fp_operation_transform_32B(uint8_t *data, uint32_t index, uint32_t *op) 
       if(isnan(*floatp)) *floatp = index;
 
       /* Add result of floating point operation to op */
-      temp = (uint8_t *) floatp;
+      uint8_t *temp = (uint8_t *) floatp;
       for(j = 0; j < 4; j++) {
          *op += temp[j];
       }
@@ -535,7 +536,6 @@ void cl_fp_operation_transform_32B(uint8_t *data, uint32_t index, uint32_t *op) 
 }
 
 void cl_fp_operation_transform_36B(uint8_t *data, uint32_t index, uint32_t *op) {
-   uint8_t *temp;
    const uint32_t adjustedlen = 36;
    int32_t i, j, operand;
    float floatv;
@@ -610,7 +610,7 @@ void cl_fp_operation_transform_36B(uint8_t *data, uint32_t index, uint32_t *op) 
       if(isnan(*floatp)) *floatp = index;
 
       /* Add result of floating point operation to op */
-      temp = (uint8_t *) floatp;
+      uint8_t *temp = (uint8_t *) floatp;
       for(j = 0; j < 4; j++) {
          *op += temp[j];
       }
@@ -839,13 +839,13 @@ void cl_nighthash_update(CUDA_NIGHTHASH_CTX *ctx, uint8_t *in, uint32_t inlen) {
 void cl_nighthash_final(CUDA_NIGHTHASH_CTX *ctx, uint8_t *out) {
 	if (ctx->algo_type == 6) {
 		cl_md2_final(&(ctx->md2), out);
-		for (int i = 0; i < 16; i++) {
-			((uint8_t*)(out+16))[i] = 0;
+		for (int i = 0; i < 2; i++) {
+			((uint64_t*)(out+16))[i] = 0;
 		}
 	} else if (ctx->algo_type == 7) {
 		cl_md5_final(&(ctx->md5), out);
-		for (int i = 0; i < 16; i++) {
-			((uint8_t*)(out+16))[i] = 0;
+		for (int i = 0; i < 2; i++) {
+			((uint64_t*)(out+16))[i] = 0;
 		}
 	}
 }
