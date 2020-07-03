@@ -23,7 +23,6 @@ typedef uchar BYTE;             // 8-bit byte
 typedef uint  WORD;             // 32-bit word, change to "long" for 16-bit machines
 typedef ulong LONG;
 #define __forceinline__ inline
-#define memcpy(dst,src,size); { for (int mi = 0; mi < size; mi++) { ((uint8_t*)dst)[mi] = ((uint8_t*)src)[mi]; } }
 #define printf16(head, var); printf(head \
 					 "%02x %02x %02x %02x " \
 					 "%02x %02x %02x %02x " \
@@ -52,7 +51,6 @@ typedef ulong LONG;
 					 var[28], var[29], var[30], var[31]);
 
 
-#define HASHLENMID 	                   16
 #define HASHLEN                        32
 #define TILE_ROWS                      32
 #define TILE_LENGTH (TILE_ROWS * HASHLEN)
@@ -60,8 +58,6 @@ typedef ulong LONG;
 #define MAP                       1048576
 #define MAP_LENGTH    (TILE_LENGTH * MAP)
 #define JUMP                            8
-
-#define PEACH_DEBUG                     0
 
 typedef struct {
 	BYTE data[64];
@@ -78,20 +74,17 @@ typedef struct {
 } CUDA_MD2_CTX;
 
 typedef struct {
-
    uint32_t algo_type;
-
    union {
 	   CUDA_MD2_CTX md2;
 	   CUDA_MD5_CTX md5;
    };
-
 } CUDA_NIGHTHASH_CTX;
 
-uint8_t *trigg_gen(uint8_t *in);
 void cl_nighthash_init_transform_32B(CUDA_NIGHTHASH_CTX *ctx, uint8_t *algo_type_seed, uint32_t index);
 void cl_nighthash_init_transform_36B(CUDA_NIGHTHASH_CTX *ctx, uint8_t *algo_type_seed, uint32_t index);
 void cl_nighthash_init_notransform_1060B(CUDA_NIGHTHASH_CTX *ctx, uint8_t *algo_type_seed, uint32_t index);
+void cl_nighthash_algoinit(CUDA_NIGHTHASH_CTX *ctx);
 void cl_nighthash_update(CUDA_NIGHTHASH_CTX *ctx, uint8_t *in, uint32_t inlen);
 void cl_nighthash_final(CUDA_NIGHTHASH_CTX *ctx, uint8_t *out);
 void SHA2_256_36B(uint *Digest, const uint *InData);
@@ -132,8 +125,7 @@ uint32_t cl_next_index(uint32_t index, __global uint8_t *g_map, uint8_t *nonce, 
    uint8_t *seed = scratch;
    const int seedlen = HASHLEN + 4 + TILE_LENGTH;
 
-   uint8_t hash[HASHLEN];
-   int i = 0;
+   uint32_t hash[HASHLEN];
 
    /* Create nighthash seed for this index on the map */
    #pragma unroll
@@ -166,6 +158,7 @@ uint32_t cl_next_index(uint32_t index, __global uint8_t *g_map, uint8_t *nonce, 
    } else if (nighthash.algo_type == 5) {
 	   Keccak256Digest1060B((ulong*)hash, (ulong*)seed);
    } else {
+	   cl_nighthash_algoinit(&nighthash);
 	   /* Update nighthash with the seed data */
 	   cl_nighthash_update(&nighthash, seed, seedlen);
 
@@ -174,8 +167,9 @@ uint32_t cl_next_index(uint32_t index, __global uint8_t *g_map, uint8_t *nonce, 
    }
 
    /* Convert 32-byte Hash Value Into 8x 32-bit Unsigned Integer */
+   index = 0;
    #pragma unroll
-   for(i = 0, index = 0; i < 8; i++) {
+   for(int i = 0; i < 8; i++) {
       index += ((uint32_t *) hash)[i];
    }
 
@@ -222,6 +216,7 @@ void cl_gen_tile(uint32_t index, __global uint8_t *g_map, uint8_t debug, __globa
    } else if (nighthash.algo_type == 5) {
 	   Keccak256Digest36B((ulong*)local_out, (ulong*)seed);
    } else {
+	   cl_nighthash_algoinit(&nighthash);
 	   /* Update nighthash with the seed data */
 	   cl_nighthash_update(&nighthash, seed, seedlen);
 
@@ -263,6 +258,7 @@ void cl_gen_tile(uint32_t index, __global uint8_t *g_map, uint8_t debug, __globa
 		   Keccak256Digest36B((ulong*)local_out, (ulong*)local_out);
 	   } else {
 		   /* Update nighthash with the seed data and tile index */
+		   cl_nighthash_algoinit(&nighthash);
 		   cl_nighthash_update(&nighthash, local_out, HASHLEN+4);
 		   cl_nighthash_final(&nighthash, local_out);
 	   }
@@ -755,12 +751,6 @@ void cl_nighthash_init_common(CUDA_NIGHTHASH_CTX *ctx, uint32_t algo_type) {
 	}
 
 	ctx->algo_type = algo_type & 7;
-
-	if (ctx->algo_type == 6) {
-		cl_md2_init(&(ctx->md2));
-	} else if (ctx->algo_type == 7) {
-		cl_md5_init(&(ctx->md5));
-	}
 }
 
 void cl_nighthash_init_transform_32B(CUDA_NIGHTHASH_CTX *ctx, uint8_t *algo_type_seed, uint32_t index) {
@@ -801,6 +791,13 @@ void cl_nighthash_init_notransform_1060B(CUDA_NIGHTHASH_CTX *ctx, uint8_t *algo_
 	cl_nighthash_init_common(ctx, algo_type);
 }
 
+void cl_nighthash_algoinit(CUDA_NIGHTHASH_CTX *ctx) {
+	if (ctx->algo_type == 6) {
+		cl_md2_init(&(ctx->md2));
+	} else if (ctx->algo_type == 7) {
+		cl_md5_init(&(ctx->md5));
+	}
+}
 
 void cl_nighthash_update(CUDA_NIGHTHASH_CTX *ctx, uint8_t *in, uint32_t inlen) {
 	if (ctx->algo_type == 6) {
