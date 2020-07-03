@@ -125,8 +125,7 @@ __constant static int Z_ADJ[64] =
     88,89,90,91,92,94,95,96,97,98,99,100,101,102,103,104,105,107,108,109,110,112,114,
     115,116,117,118,119,120,121,122,123,124,125,126,127,128};
 
-uint32_t cl_next_index(uint32_t index, __global uint8_t *g_map, uint8_t *nonce, uint8_t *scratch, uint8_t debug)
-{
+uint32_t cl_next_index(uint32_t index, __global uint8_t *g_map, uint8_t *nonce, uint8_t *scratch) {
    CUDA_NIGHTHASH_CTX nighthash;
 
    //uint8_t seed[HASHLEN + 4 + TILE_LENGTH];
@@ -137,22 +136,15 @@ uint32_t cl_next_index(uint32_t index, __global uint8_t *g_map, uint8_t *nonce, 
    int i = 0;
 
    /* Create nighthash seed for this index on the map */
-#pragma unroll
-    for (int i = 0; i < HASHLEN/8; i++) {
-	    ((uint64_t*)seed)[i] = ((uint64_t*)(nonce))[i];
-    }
-   ((uint32_t*)(seed+HASHLEN))[0] = ((uint32_t*)&index)[0];
-#pragma unroll
-    for (int i = 0; i < TILE_LENGTH/4; i++) {
-	    ((uint32_t*)(seed+HASHLEN+4))[i] = ((global uint32_t*)(g_map+index*TILE_LENGTH))[i];
-    }
-
-#ifdef DEBUG
-   if (debug) {
-	   printf32("first tile: ", (&g_map[index * TILE_LENGTH]));
-	   printf32("cl_next_index seed: ", seed);
+   #pragma unroll
+   for (int i = 0; i < HASHLEN/8; i++) {
+	   ((uint64_t*)seed)[i] = ((uint64_t*)(nonce))[i];
    }
-#endif
+   ((uint32_t*)(seed+HASHLEN))[0] = ((uint32_t*)&index)[0];
+   #pragma unroll
+   for (int i = 0; i < TILE_LENGTH/4; i++) {
+	   ((uint32_t*)(seed+HASHLEN+4))[i] = ((global uint32_t*)(g_map+index*TILE_LENGTH))[i];
+   }
    
    /* Setup nighthash the seed, NO TRANSFORM */
    cl_nighthash_init_notransform_1060B(&nighthash, seed, index);
@@ -163,8 +155,9 @@ uint32_t cl_next_index(uint32_t index, __global uint8_t *g_map, uint8_t *nonce, 
 	   Blake2B_K64_1060B((uchar*)hash, (uchar*)seed);
    } else if (nighthash.algo_type == 2) {
 	   SHA1Digest1060B((uint*)hash, (uint*)seed);
-	   for (int i = 0; i < 12; i++) {
-		   hash[20+i] = 0;
+	   #pragma unroll
+	   for (int i = 0; i < 3; i++) {
+		   ((uint32_t*)(hash+20))[i] = 0;
 	   }
    } else if (nighthash.algo_type == 3) {
 	   SHA2_256_1056B_1060B((uint*)hash, (uint*)seed, true);
@@ -181,11 +174,12 @@ uint32_t cl_next_index(uint32_t index, __global uint8_t *g_map, uint8_t *nonce, 
    }
 
    /* Convert 32-byte Hash Value Into 8x 32-bit Unsigned Integer */
+   #pragma unroll
    for(i = 0, index = 0; i < 8; i++) {
       index += ((uint32_t *) hash)[i];
    }
 
-   return index % MAP;
+   return index & 0xfffff; // equivalent to index % MAP
 }
 
 
@@ -202,12 +196,11 @@ void cl_gen_tile(uint32_t index, __global uint8_t *g_map, uint8_t debug, __globa
 
    /* Create nighthash seed for this index on the map */
    seedlen = 4 + HASHLEN;
-    for (int i = 0; i < 4; i++) {
-	    seed[i] = ((uint8_t*)&index)[i];
-    }
-    for (int i = 0; i < HASHLEN; i++) {
-	    (seed+4)[i] = ((__global uint8_t*)c_phash)[i];
-    }
+   ((uint32_t*)(seed))[0] = ((uint32_t*)&index)[0];
+   #pragma unroll
+   for (int i = 0; i < HASHLEN/4; i++) {
+	   ((uint32_t*)(seed+4))[i] = ((__global uint32_t*)c_phash)[i];
+   }
 
    /* Setup nighthash with a transform of the seed */
    cl_nighthash_init_transform_36B(&nighthash, seed, index);
@@ -218,17 +211,17 @@ void cl_gen_tile(uint32_t index, __global uint8_t *g_map, uint8_t debug, __globa
 	   Blake2B_K64_36B((uchar*)local_out, (uchar*)seed);
    } else if (nighthash.algo_type == 2) {
 	   SHA1Digest36B((uint*)local_out, (uint*)seed);
-	   for (int i = 0; i < 12; i++) {
-		   local_out[20+i] = 0;
+	   #pragma unroll
+	   for (int i = 0; i < 3; i++) {
+		   ((uint32_t*)(local_out+20))[i] = 0;
 	   }
    } else if (nighthash.algo_type == 3) {
 	   SHA2_256_36B((uint*)local_out, (uint*)seed);
    } else if (nighthash.algo_type == 4) {
-   	SHA3256Digest36B((ulong*)local_out, (ulong*)seed);
+	   SHA3256Digest36B((ulong*)local_out, (ulong*)seed);
    } else if (nighthash.algo_type == 5) {
-   	Keccak256Digest36B((ulong*)local_out, (ulong*)seed);
+	   Keccak256Digest36B((ulong*)local_out, (ulong*)seed);
    } else {
-
 	   /* Update nighthash with the seed data */
 	   cl_nighthash_update(&nighthash, seed, seedlen);
 
@@ -236,6 +229,7 @@ void cl_gen_tile(uint32_t index, __global uint8_t *g_map, uint8_t debug, __globa
 	   cl_nighthash_final(&nighthash, local_out);
    }
 
+   #pragma unroll
    for (int i = 0; i < HASHLEN/8; i++) {
 	   ((global uint64_t*)(tilep))[i] = ((uint64_t*)(local_out))[i];
    }
@@ -245,13 +239,11 @@ void cl_gen_tile(uint32_t index, __global uint8_t *g_map, uint8_t debug, __globa
 	   /* Hash the current row to the next, if not at the end */
 	   /* Setup nighthash with a transform of the current row */
 	   cl_nighthash_init_transform_32B(&nighthash, local_out, index);
-	   for (int z = 0; z < HASHLEN; z++) {
-		   tilep[i+z] = local_out[z];
+	   #pragma unroll
+	   for (int z = 0; z < HASHLEN/8; z++) {
+		   ((global uint64_t*)(tilep+i))[z] = ((uint64_t*)(local_out))[z];
 	   }
-	   // Copy index to end of local_out
-	   for (int z = 0; z < 4; z++) {
-		   local_out[HASHLEN+z] = ((uint8_t*)&index)[z];
-	   }
+	   ((uint32_t*)(local_out+HASHLEN))[0] = ((uint32_t*)&index)[0];
 
 	   if (nighthash.algo_type == 0) {
 		   Blake2B_K32_36B((uchar*)local_out, (uchar*)local_out);
@@ -259,8 +251,9 @@ void cl_gen_tile(uint32_t index, __global uint8_t *g_map, uint8_t debug, __globa
 		   Blake2B_K64_36B((uchar*)local_out, (uchar*)local_out);
 	   } else if (nighthash.algo_type == 2) {
 		   SHA1Digest36B((uint*)local_out, (uint*)local_out);
-		   for (int i = 0; i < 12; i++) {
-			   local_out[20+i] = 0;
+		   #pragma unroll
+		   for (int i = 0; i < 3; i++) {
+			   ((uint32_t*)(local_out+20))[i] = 0;
 		   }
 	   } else if (nighthash.algo_type == 3) {
 		   SHA2_256_36B((uint*)local_out, (uint*)local_out);
@@ -273,6 +266,7 @@ void cl_gen_tile(uint32_t index, __global uint8_t *g_map, uint8_t debug, __globa
 		   cl_nighthash_update(&nighthash, local_out, HASHLEN+4);
 		   cl_nighthash_final(&nighthash, local_out);
 	   }
+	   #pragma unroll
 	   for (int z = 0; z < HASHLEN/8; z++) {
 		   ((global uint64_t*)(tilep+j))[z] = ((uint64_t*)(local_out))[z];
 	   }
@@ -310,9 +304,9 @@ __kernel void cl_find_peach(uint32_t threads, __global uint8_t *g_map,
    uint8_t x;
    uint32_t sm;
 
-   if (thread < threads) {
+   if (thread < threads && thread < 131072) {
       /* Determine second seed */
-      if(thread < 131072) { /* This frame permutations: 131,072 */
+      //if(thread < 131072) { /* This frame permutations: 131,072 */
          seed[ 0] = Z_TIME[(thread & 15)];
          seed[ 1] = Z_AMB[(thread >> 4) & 15];
          seed[ 2] = 1;
@@ -320,7 +314,7 @@ __kernel void cl_find_peach(uint32_t threads, __global uint8_t *g_map,
          seed[ 4] = Z_MASS[(thread >> 14) & 3];
          seed[ 5] = 1;
          seed[ 6] = Z_ING[(thread >> 16) & 1];
-      }
+      //}
 
       /* store full nonce */
       #pragma unroll
@@ -335,11 +329,11 @@ __kernel void cl_find_peach(uint32_t threads, __global uint8_t *g_map,
       /* Hash 124 bytes of Block Trailer, including both seeds */
 
       uint8_t l_input[124];
-#pragma unroll
+      #pragma unroll
       for (int i = 0; i < 108/4; i++) {
 	      ((uint32_t*)(l_input))[i] = ((global uint32_t*)(c_input))[i];
       }
-#pragma unroll
+      #pragma unroll
       for (int i = 0; i < 16; i++) {
 	      l_input[108+i] = nonce[16+i];
       }
@@ -353,13 +347,14 @@ __kernel void cl_find_peach(uint32_t threads, __global uint8_t *g_map,
       for(i = 1; i < HASHLEN; i++) {
          sm *= bt_hash[i];
       }
-      sm %= MAP;
+      //sm %= MAP;
+      sm &= 0xfffff; // equivalent to sm %= MAP
 
-uint32_t sm_chain[JUMP];
+      uint32_t sm_chain[JUMP];
       /* make <JUMP> tile jumps to find the final tile */
       #pragma unroll
       for(j = 0; j < JUMP; j++) {
-        sm = cl_next_index(sm, g_map, nonce, scratch, /*thread == 122868 ? 1 :*/ 0);
+        sm = cl_next_index(sm, g_map, nonce, scratch);
 	sm_chain[j] = sm;
       }
 
@@ -367,11 +362,11 @@ uint32_t sm_chain[JUMP];
       /* Check the hash of the final tile produces the desired result */
 
       uint64_t btbuf[HASHLEN+TILE_LENGTH];
-#pragma unroll
+      #pragma unroll
       for (int i = 0; i < HASHLEN/8; i++) {
 	      btbuf[i] = ((uint64_t*)bt_hash)[i];
       }
-#pragma unroll
+      #pragma unroll
       for (int i = 0; i < TILE_LENGTH/8; i++) {
 	      btbuf[HASHLEN/8+i] = ((global uint64_t*)(g_map+sm*TILE_LENGTH))[i];
       }
@@ -379,54 +374,32 @@ uint32_t sm_chain[JUMP];
 
       /* Evaluate hash */
       for (x = i = j = n = 0; i < HASHLEN; i++) {
-         x = fhash[i];
-         if (x != 0) {
-            /*for(j = 7; j > 0; j--) {
-               x >>= 1;
-               if(x == 0) {
-                  n += j;
-                  break;
-               }
-            }
-            break;*/
-		n += clz(x);
-		break;
-         }
-         n += 8;
+	      x = fhash[i];
+	      if (x != 0) {
+		      n += clz(x);
+		      break;
+	      }
+	      n += 8;
       }
 
-if (n>=c_difficulty) {
-	printf("found!! t: %d, n: %d\n", thread, n);
-}
-	  if (n >= c_difficulty && !atomic_xchg(g_found, 1)) {
-	  //if (thread == 122868 && !atomic_xchg(g_found,1)) {
-		  /* PRINCESS FOUND! */
-#ifdef DEBUG
-		  printf("t: %d, n: %d\n", thread, n);
-		  printf("sm: %d, %d, %d, %d, %d, %d, %d, %d\n",
-				  sm_chain[0], sm_chain[1], sm_chain[2], sm_chain[3],
-				  sm_chain[4], sm_chain[5], sm_chain[6], sm_chain[7]);
-#endif
-         #pragma unroll
-         for (i = 0; i < 16; i++) {
-            g_seed[i] = seed[i];
-            //g_seed[i] = l_tile[i];
-	    //g_seed[i] = l_input[i];
-	 }
-#ifdef DEBUG
-		printf("n: %d, c_difficulty: %d\n", n, c_difficulty);
-		printf16("seed: ", seed);
-		printf32("hash: ", fhash);
-		printf32("bt_hash: ", bt_hash);
-#endif
+      if (n>=c_difficulty) {
+	      printf("found!! t: %d, n: %d\n", thread, n);
+      }
+
+      if (n >= c_difficulty && !atomic_xchg(g_found, 1)) {
+	      /* PRINCESS FOUND! */
+	      #pragma unroll
+	      for (i = 0; i < 2; i++) {
+		      ((global uint64_t*)(g_seed))[i] = ((uint64_t*)(seed))[i];
+	      }
       }
       /* Our princess is in another castle ! */
    }
-   else {
 #ifdef DEBUG
+   else {
 	   printf("WARNING: thread >= threads: %d\n", thread);
-#endif
    }
+#endif
 }
 
 
@@ -773,8 +746,12 @@ uint32_t cl_bitbyte_transform(uint8_t *data, uint32_t len, uint32_t op)
 
 void cl_nighthash_init_common(CUDA_NIGHTHASH_CTX *ctx, uint32_t algo_type) {
 	/* Clear nighthash context */
-	for (int i = 0; i < sizeof(CUDA_NIGHTHASH_CTX); i++) {
+	/*for (int i = 0; i < sizeof(CUDA_NIGHTHASH_CTX); i++) {
 		((uint8_t*)ctx)[i] = 0;
+	}*/
+#pragma unroll
+	for (int i = 0; i < sizeof(CUDA_NIGHTHASH_CTX)/8; i++) {
+		((uint64_t*)ctx)[i] = 0;
 	}
 
 	ctx->algo_type = algo_type & 7;
@@ -787,8 +764,7 @@ void cl_nighthash_init_common(CUDA_NIGHTHASH_CTX *ctx, uint32_t algo_type) {
 }
 
 void cl_nighthash_init_transform_32B(CUDA_NIGHTHASH_CTX *ctx, uint8_t *algo_type_seed, uint32_t index) {
-	uint32_t algo_type;
-	algo_type = 0;
+	uint32_t algo_type = 0;
 
 	/* Perform floating point operations to transform (if transform byte is set)
 	 * input data and determine algo type */
@@ -802,8 +778,7 @@ void cl_nighthash_init_transform_32B(CUDA_NIGHTHASH_CTX *ctx, uint8_t *algo_type
 }
 
 void cl_nighthash_init_transform_36B(CUDA_NIGHTHASH_CTX *ctx, uint8_t *algo_type_seed, uint32_t index) {
-	uint32_t algo_type;
-	algo_type = 0;
+	uint32_t algo_type = 0;
 
 	/* Perform floating point operations to transform (if transform byte is set)
 	 * input data and determine algo type */
@@ -817,8 +792,7 @@ void cl_nighthash_init_transform_36B(CUDA_NIGHTHASH_CTX *ctx, uint8_t *algo_type
 }
 
 void cl_nighthash_init_notransform_1060B(CUDA_NIGHTHASH_CTX *ctx, uint8_t *algo_type_seed, uint32_t index) {
-	uint32_t algo_type;
-	algo_type = 0;
+	uint32_t algo_type = 0;
 
 	/* Perform floating point operations to transform (if transform byte is set)
 	 * input data and determine algo type */
