@@ -231,15 +231,26 @@ void cl_gen_tile(uint32_t index, __global uint8_t *g_map, uint8_t debug, __globa
    for(int i = 0, j = HASHLEN; j < TILE_LENGTH; i += HASHLEN, j += HASHLEN) { /* For each tile row */
 	   /* Hash the current row to the next, if not at the end */
 	   /* Setup nighthash with a transform of the current row */
+	   if (index == 0 && i >= 96 && i <= 128) {
+		   //printf("tilep %d, algotype: %d\n", i, nighthash.algo_type);
+		   printf32("", (tilep+i));
+	   }
 	   cl_nighthash_init_transform_32B(&nighthash, local_out, index);
 	   #pragma unroll
 	   for (int z = 0; z < HASHLEN/8; z++) {
 		   ((global uint64_t*)(tilep+i))[z] = ((uint64_t*)(local_out))[z];
 	   }
+	   if (index == 0 && i >= 96 && i <= 128) {
+		   //printf("tilep %d, algotype: %d\n", i, nighthash.algo_type);
+		   printf32("", (tilep+i));
+	   }
 	   ((uint32_t*)(local_out+HASHLEN))[0] = ((uint32_t*)&index)[0];
 
 	   if (nighthash.algo_type == 0) {
 		   Blake2B_K32_36B((uchar*)local_out, (uchar*)local_out);
+	   if (index == 0 && j < 512) {
+		   //printf32("", (local_out));
+	   }
 	   } else if (nighthash.algo_type == 1) {
 		   Blake2B_K64_36B((uchar*)local_out, (uchar*)local_out);
 	   } else if (nighthash.algo_type == 2) {
@@ -264,13 +275,20 @@ void cl_gen_tile(uint32_t index, __global uint8_t *g_map, uint8_t debug, __globa
 	   for (int z = 0; z < HASHLEN/8; z++) {
 		   ((global uint64_t*)(tilep+j))[z] = ((uint64_t*)(local_out))[z];
 	   }
+#if 0
+	   if (index == 0 && i >= 96 && i <= 128) {
+		   //printf("tilep %d, algotype: %d\n", j, nighthash.algo_type);
+		   printf32("", (tilep+j));
+	   }
+#endif
    }
 }
 
 
 __kernel void cl_build_map(__global uint8_t *g_map, __global uint8_t *c_phash, uint32_t start_index) {
    uint32_t thread = get_global_id(0) + start_index;
-   if (thread < MAP) {
+   //if (thread < MAP) {
+   if (thread == 0) {
       cl_gen_tile(thread, g_map, /*thread == 32 ? 1 :*/ 0 , c_phash);
    }
 
@@ -416,6 +434,8 @@ uint32_t cl_fp_operation_transform_inner(uint8_t *data, uint32_t index, uint32_t
 	((uint*)udata)[0] = ((uint*)(data))[0];
 	/* Cast 4 byte piece to float pointer */
 	floatp = (float*)udata;
+	if (index == 0) printf("udata[0]: %d, udata[1]: %d, udata[2]: %d, udata[3]: %d\n", udata[0], udata[1], udata[2], udata[3]);
+	if (index == 0) printf("*floatp: %e\n", *floatp); 
 
 	/* 4 byte separation order depends on initial byte:
 	 * #1) *op = data... determine floating point operation type
@@ -427,25 +447,16 @@ uint32_t cl_fp_operation_transform_inner(uint8_t *data, uint32_t index, uint32_t
 	uchar op1 = (d7 == 0) | (d7 == 6);
 	uchar op2 = (d7 == 5) | (d7 == 7);
 	uchar op3 = (d7 == 1) | (d7 == 4);
-	if (op0) {
-		op += udata[0];
-	} else if (op1) {
-		op += udata[1];
-	} else if (op2) {
-		op += udata[2];
-	} else if (op3) {
-		op += udata[3];
-	}
+	op += (op0) ? udata[0] : 0;
+	op += (op1) ? udata[1] : 0;
+	op += (op2) ? udata[2] : 0;
+	op += (op3) ? udata[3] : 0;
 	uchar oper0 = (d7 == 4) | (d7 == 5);
 	uchar oper1 = (d7 == 1) | (d7 == 3) | (d7 == 6) | (d7 == 7);
 	uchar oper2 = (d7 == 0) | (d7 == 2);
-	if (oper0) {
-		operand = udata[0];
-	} else if (oper1) {
-		operand = udata[1];
-	} else if (oper2) {
-		operand = udata[2];
-	}
+	operand = oper0 ? udata[0] : operand;
+	operand = oper1 ? udata[1] : operand;
+	operand = oper2 ? udata[2] : operand;
 	//uchar sign1 = (d7 == 4) | (d7 == 5);
 	uchar sign1 = oper0;
 	uchar sign2 = (d7 == 1) | (d7 == 3);
@@ -460,12 +471,15 @@ uint32_t cl_fp_operation_transform_inner(uint8_t *data, uint32_t index, uint32_t
 
 	/* Cast operand to float */
 	floatv = operand;
+	if (index == 0) printf("floatv: %e\n", floatv);
 
 	/* Replace pre-operation NaN with index */
 	if (isnan(*floatp)) *floatp = index;
+	if (index == 0) printf("*floatp: %e\n", *floatp);
 
 	/* Perform predetermined floating point operation */
 	uint lop = op & 3;
+	if (index == 0) printf("lop: %d\n", lop);
 	if (lop == 0) {
 		*floatp += floatv;
 	} else if (lop == 1) {
@@ -473,18 +487,34 @@ uint32_t cl_fp_operation_transform_inner(uint8_t *data, uint32_t index, uint32_t
 	} else if (lop == 2) {
 		*floatp *= floatv;
 	} else if (lop == 3) {
+		double d = *floatp;
+		d /= floatv;
+		if (index == 0) printf("d: %e\n", d);
+		uint8_t *dt = (uint8_t*)&d;
+		printf("dt[0]: %d, dt[1]: %d, dt[2]: %d, dt[3]: %d, dt[4]: %d, dt[5]: %d, dt[6]: %d, dt[7]: %d\n", dt[0], dt[1], dt[2], dt[3], dt[4], dt[5], dt[6], dt[7]);
+		float f = convert_float_rtn(d);
+		uint8_t *df = (uint8_t)&f;
+		printf("f: %e, df[0]: %d, df[1]: %d, df[2]: %d, df[3]: %d\n", f, df[0], df[1], df[2], df[3]);
 		*floatp /= floatv;
+
 	}
+	if (index == 0) printf("*floatp: %e\n", *floatp);
 
 	/* Replace post-operation NaN with index */
 	if (isnan(*floatp)) *floatp = index;
+	if (index == 0) printf("*floatp: %e\n", *floatp);
 
 	/* Add result of floating point operation to op */
-	uint8_t *temp = (uint8_t *) floatp;
+	//uint8_t *temp = (uint8_t *) floatp;
+	uint utemp = as_uint(*floatp);
+	uint8_t *temp = (uchar*)&utemp;
 	op += temp[0] + temp[1] + temp[2] + temp[3];
 
 	((uint*)(data))[0] = ((uint*)udata)[0];
 
+	if (index == 0) {
+		printf("*floatp: %e, temp[0]: %d, temp[1]: %d, temp[2]: %d, temp[3]: %d, op: %d\n", *floatp, temp[0], temp[1], temp[2], temp[3], op);
+	}
 	return op;
 }
 
@@ -502,7 +532,7 @@ uint32_t cl_fp_operation_transform_32B(uint8_t *data, uint32_t index) {
    uint32_t op = 0;
    
    /* Work on data 4 bytes at a time */
-   #pragma unroll 16
+   #pragma unroll
    for(int i = 0; i < adjustedlen; i += 4) {
 	   op = cl_fp_operation_transform_inner(data+i, index, op);
    } /* end for(*op = 0... */
@@ -514,7 +544,7 @@ uint32_t cl_fp_operation_transform_36B(uint8_t *data, uint32_t index) {
    uint32_t op = 0;
    
    /* Work on data 4 bytes at a time */
-   #pragma unroll 18
+   #pragma unroll
    for (int i = 0; i < adjustedlen; i += 4) {
 	   op = cl_fp_operation_transform_inner(data+i, index, op);
    } /* end for(*op = 0... */
@@ -555,25 +585,16 @@ uint32_t cl_fp_operation_notransform_1060B(uint8_t *data, uint32_t index) {
       uchar op1 = (d7 == 0) | (d7 == 6);
       uchar op2 = (d7 == 5) | (d7 == 7);
       uchar op3 = (d7 == 1) | (d7 == 4);
-      if (op0) {
-	      op += udata[0];
-      } else if (op1) {
-	      op += udata[1];
-      } else if (op2) {
-	      op += udata[2];
-      } else if (op3) {
-	      op += udata[3];
-      }
+      op += (op0) ? udata[0] : 0;
+      op += (op1) ? udata[1] : 0;
+      op += (op2) ? udata[2] : 0;
+      op += (op3) ? udata[3] : 0;
       uchar oper0 = (d7 == 4) | (d7 == 5);
       uchar oper1 = (d7 == 1) | (d7 == 3) | (d7 == 6) | (d7 == 7);
       uchar oper2 = (d7 == 0) | (d7 == 2);
-      if (oper0) {
-	      operand = udata[0];
-      } else if (oper1) {
-	      operand = udata[1];
-      } else if (oper2) {
-	      operand = udata[2];
-      }
+      operand = oper0 ? udata[0] : operand;
+      operand = oper1 ? udata[1] : operand;
+      operand = oper2 ? udata[2] : operand;
       //uchar sign1 = (d7 == 4) | (d7 == 5);
       uchar sign1 = oper0;
       uchar sign2 = (d7 == 1) | (d7 == 3);
@@ -624,7 +645,7 @@ uint32_t cl_fp_operation_notransform_1060B(uint8_t *data, uint32_t index) {
  * @param *op       - pointer to the operator value */
 uint32_t cl_bitbyte_transform(uint8_t *data, uint32_t len, uint32_t op) {
    /* Perform <TILE_TRANSFORMS> number of bit/byte manipulations */
-   #pragma unroll
+   //#pragma unroll
    for(int32_t i = 0; i < TILE_TRANSFORMS; i++) {
       /* Determine operation to use this iteration */
       op += data[i & 31];
@@ -673,9 +694,18 @@ void cl_nighthash_init_transform_32B(CUDA_NIGHTHASH_CTX *ctx, uint8_t *algo_type
 	 * input data and determine algo type */
 	uint32_t algo_type = cl_fp_operation_transform_32B(algo_type_seed, index);
 
+	   if (index == 0) {
+		   printf("algo_type: %d\n", algo_type);
+		   printf32("pre_bitbyte: ", (algo_type_seed));
+	   }
 	/* Perform bit/byte transform operations to transform (if transform byte is set)
 	 * input data and determine algo type */
 	algo_type = cl_bitbyte_transform(algo_type_seed, 32, algo_type);
+
+	   if (index == 0) {
+		   printf("algo_type: %d\n", algo_type);
+		   printf32("post_bitbyte: ", (algo_type_seed));
+	   }
 
 	ctx->algo_type = algo_type & 7;
 }
