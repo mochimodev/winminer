@@ -231,26 +231,27 @@ void cl_gen_tile(uint32_t index, __global uint8_t *g_map, uint8_t debug, __globa
    for(int i = 0, j = HASHLEN; j < TILE_LENGTH; i += HASHLEN, j += HASHLEN) { /* For each tile row */
 	   /* Hash the current row to the next, if not at the end */
 	   /* Setup nighthash with a transform of the current row */
+#if 0
 	   if (index == 0 && i >= 96 && i <= 128) {
 		   //printf("tilep %d, algotype: %d\n", i, nighthash.algo_type);
 		   printf32("", (tilep+i));
 	   }
+#endif
 	   cl_nighthash_init_transform_32B(&nighthash, local_out, index);
 	   #pragma unroll
 	   for (int z = 0; z < HASHLEN/8; z++) {
 		   ((global uint64_t*)(tilep+i))[z] = ((uint64_t*)(local_out))[z];
 	   }
+#if 0
 	   if (index == 0 && i >= 96 && i <= 128) {
 		   //printf("tilep %d, algotype: %d\n", i, nighthash.algo_type);
 		   printf32("", (tilep+i));
 	   }
+#endif
 	   ((uint32_t*)(local_out+HASHLEN))[0] = ((uint32_t*)&index)[0];
 
 	   if (nighthash.algo_type == 0) {
 		   Blake2B_K32_36B((uchar*)local_out, (uchar*)local_out);
-	   if (index == 0 && j < 512) {
-		   //printf32("", (local_out));
-	   }
 	   } else if (nighthash.algo_type == 1) {
 		   Blake2B_K64_36B((uchar*)local_out, (uchar*)local_out);
 	   } else if (nighthash.algo_type == 2) {
@@ -287,8 +288,8 @@ void cl_gen_tile(uint32_t index, __global uint8_t *g_map, uint8_t debug, __globa
 
 __kernel void cl_build_map(__global uint8_t *g_map, __global uint8_t *c_phash, uint32_t start_index) {
    uint32_t thread = get_global_id(0) + start_index;
-   //if (thread < MAP) {
-   if (thread == 0) {
+   if (thread < MAP) {
+   //if (thread == 0) {
       cl_gen_tile(thread, g_map, /*thread == 32 ? 1 :*/ 0 , c_phash);
    }
 
@@ -434,8 +435,10 @@ uint32_t cl_fp_operation_transform_inner(uint8_t *data, uint32_t index, uint32_t
 	((uint*)udata)[0] = ((uint*)(data))[0];
 	/* Cast 4 byte piece to float pointer */
 	floatp = (float*)udata;
+#if 0
 	if (index == 0) printf("udata[0]: %d, udata[1]: %d, udata[2]: %d, udata[3]: %d\n", udata[0], udata[1], udata[2], udata[3]);
 	if (index == 0) printf("*floatp: %e\n", *floatp); 
+#endif
 
 	/* 4 byte separation order depends on initial byte:
 	 * #1) *op = data... determine floating point operation type
@@ -471,15 +474,15 @@ uint32_t cl_fp_operation_transform_inner(uint8_t *data, uint32_t index, uint32_t
 
 	/* Cast operand to float */
 	floatv = operand;
-	if (index == 0) printf("floatv: %e\n", floatv);
+	//if (index == 0) printf("floatv: %e\n", floatv);
 
 	/* Replace pre-operation NaN with index */
 	if (isnan(*floatp)) *floatp = index;
-	if (index == 0) printf("*floatp: %e\n", *floatp);
+	//if (index == 0) printf("*floatp: %e\n", *floatp);
 
 	/* Perform predetermined floating point operation */
 	uint lop = op & 3;
-	if (index == 0) printf("lop: %d\n", lop);
+	//if (index == 0) printf("lop: %d\n", lop);
 	if (lop == 0) {
 		*floatp += floatv;
 	} else if (lop == 1) {
@@ -489,20 +492,45 @@ uint32_t cl_fp_operation_transform_inner(uint8_t *data, uint32_t index, uint32_t
 	} else if (lop == 3) {
 		double d = *floatp;
 		d /= floatv;
+#if 0
 		if (index == 0) printf("d: %e\n", d);
 		uint8_t *dt = (uint8_t*)&d;
 		printf("dt[0]: %d, dt[1]: %d, dt[2]: %d, dt[3]: %d, dt[4]: %d, dt[5]: %d, dt[6]: %d, dt[7]: %d\n", dt[0], dt[1], dt[2], dt[3], dt[4], dt[5], dt[6], dt[7]);
-		float f = convert_float_rtn(d);
-		uint8_t *df = (uint8_t)&f;
-		printf("f: %e, df[0]: %d, df[1]: %d, df[2]: %d, df[3]: %d\n", f, df[0], df[1], df[2], df[3]);
+#endif
+		ulong lv = as_ulong(d);
+#if 0
+		uint8_t *lvp = (uint8_t*)&lv;
+		printf("lvp[0]: %d, lvp[1]: %d, lvp[2]: %d, lvp[3]: %d, lvp[4]: %d, lvp[5]: %d, lvp[6]: %d, lvp[7]: %d\n", lvp[0], lvp[1], lvp[2], lvp[3], lvp[4], lvp[5], lvp[6], lvp[7]);
+#endif
+		uint sign     = (lv & 0x8000000000000000) >> 32;
+		uint mantissa = (lv & 0x000fffffe0000000) >> 29;
+		uint exponent = (lv & 0x7ff0000000000000) >> 52;
+		//printf("sign: %d, mantissa: %d, exponent: %d\n", sign, mantissa, exponent);
+		int sh      = exponent - 897; // (exponent - 1023) + 126
+		//printf("sh: %d\n", sh);
+		if (sh < 0) { // denormal
+			mantissa |= (1<<23);
+			mantissa >>= -sh;
+			//printf("Denormal, mantissa: %d\n", mantissa);
+		}
+		//        sign | exponent 0 (denormal) | mantissa
+		uint iv = sign | mantissa;
+		uint8_t *ivp = (uint8_t*)&iv;
+		//printf("ivp0[0]: %d, ivp[1]: %d, ivp[2]: %d, ivp[3]: %d\n", ivp[0], ivp[1], ivp[2], ivp[3]);
 		*floatp /= floatv;
+		if (sh < 0) {
+			udata[0] = ivp[0];
+			udata[1] = ivp[1];
+			udata[2] = ivp[2];
+			udata[3] = ivp[3];
+		}
 
 	}
-	if (index == 0) printf("*floatp: %e\n", *floatp);
+	//if (index == 0) printf("*floatp: %e\n", *floatp);
 
 	/* Replace post-operation NaN with index */
 	if (isnan(*floatp)) *floatp = index;
-	if (index == 0) printf("*floatp: %e\n", *floatp);
+	//if (index == 0) printf("*floatp: %e\n", *floatp);
 
 	/* Add result of floating point operation to op */
 	//uint8_t *temp = (uint8_t *) floatp;
@@ -512,9 +540,11 @@ uint32_t cl_fp_operation_transform_inner(uint8_t *data, uint32_t index, uint32_t
 
 	((uint*)(data))[0] = ((uint*)udata)[0];
 
+#if 0
 	if (index == 0) {
 		printf("*floatp: %e, temp[0]: %d, temp[1]: %d, temp[2]: %d, temp[3]: %d, op: %d\n", *floatp, temp[0], temp[1], temp[2], temp[3], op);
 	}
+#endif
 	return op;
 }
 
@@ -567,7 +597,7 @@ uint32_t cl_fp_operation_notransform_1060B(uint8_t *data, uint32_t index) {
    /* Work on data 4 bytes at a time */
    #pragma unroll 10
    for(int i = 0; i < adjustedlen; i += 4) {
-      int32_t operand;
+      int32_t operand = 0;
       float floatv, floatv1;
       uchar udata[4];
       ((uint*)udata)[0] = ((uint*)(data+i))[0];
@@ -694,18 +724,22 @@ void cl_nighthash_init_transform_32B(CUDA_NIGHTHASH_CTX *ctx, uint8_t *algo_type
 	 * input data and determine algo type */
 	uint32_t algo_type = cl_fp_operation_transform_32B(algo_type_seed, index);
 
+#if 0
 	   if (index == 0) {
 		   printf("algo_type: %d\n", algo_type);
 		   printf32("pre_bitbyte: ", (algo_type_seed));
 	   }
+#endif
 	/* Perform bit/byte transform operations to transform (if transform byte is set)
 	 * input data and determine algo type */
 	algo_type = cl_bitbyte_transform(algo_type_seed, 32, algo_type);
 
+#if 0
 	   if (index == 0) {
 		   printf("algo_type: %d\n", algo_type);
 		   printf32("post_bitbyte: ", (algo_type_seed));
 	   }
+#endif
 
 	ctx->algo_type = algo_type & 7;
 }
