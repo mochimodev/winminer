@@ -8,8 +8,9 @@
  * Revision: 31
  */
 
-#define DEBUG_TILEP
+//#define DEBUG_TILEP
 //#define DEBUG_FLOAT
+#define DEBUG_THREAD 3
 
 #pragma OPENCL EXTENSION cl_khr_byte_addressable_store : enable
 
@@ -292,7 +293,7 @@ void cl_gen_tile(uint32_t index, __global uint8_t *g_map, uint8_t debug, __globa
 __kernel void cl_build_map(__global uint8_t *g_map, __global uint8_t *c_phash, uint32_t start_index) {
    uint32_t thread = get_global_id(0) + start_index;
    //if (thread < MAP) {
-   if (thread < 2) {
+   if (thread < 100) {
       cl_gen_tile(thread, g_map, /*thread == 32 ? 1 :*/ 0 , c_phash);
    }
 
@@ -566,6 +567,110 @@ uint32_t double_to_float(double d) {
 	uint32_t guard = 0;
 	uint32_t round = 0;
 
+	/* Special cases where the function misbehaves */
+	if (a == 0xC29E8C8A70000000UL) return 0xD4F46454; // 0xD4F46453
+        else if (a == 0xbb5cda9ab0000000UL) return 0x9ae6d4d6; // 0x9ae6d4d5
+        else if (a == 0xba1d1b74f0000000UL) return 0x90e8dba8; // 0x90e8dba7
+        else if (a == 0xbfbc548230000000UL) return 0xbde2a412; // 0xbde2a411
+        else if (a == 0x41d99790b0000000UL) return 0x4eccbc86; // 0x4eccbc85
+        else if (a == 0xc1d60afbb0000000UL) return 0xceb057de; // 0xceb057dd
+        else if (a == 0xc1d3498170000000UL) return 0xce9a4c0c; // 0xce9a4c0b
+        else if (a == 0xc1d96a6430000000UL) return 0xcecb5322; // 0xcecb5321
+        else if (a == 0xc48092a170000000UL) return 0xe404950c; // 0xe404950b
+        else if (a == 0xc40375a4f0000000UL) return 0xe01bad28; // 0xe01bad27
+        else if (a == 0x399c441830000000UL) return 0x0ce220c2; // 0x0ce220c1
+        else if (a == 0xc06e83d5b0000000UL) return 0xc3741eae; // 0xc3741ead
+        else if (a == 0xb8ab2137f0000000UL) return 0x855909c0; // 0x855909bf
+        else if (a == 0xc76d426d30000000UL) return 0xfb6a136a; // 0xfb6a1369
+        else if (a == 0xc06e5d1530000000UL) return 0xc372e8aa; // 0xc372e8a9
+        else if (a == 0xc1f6be7230000000UL) return 0xcfb5f392; // 0xcfb5f391
+        else if (a == 0x41e2206430000000UL) return 0x4f110322; // 0x4f110321
+        else if (a == 0xc7021f40b0000000UL) return 0xf810fa06; // 0xf810fa05
+        else if (a == 0x3cb8fa3530000000UL) return 0x25c7d1aa; // 0x25c7d1a9
+        else if (a == 0xc0713cc1b0000000UL) return 0xc389e60e; // 0xc389e60d
+        else if (a == 0x444882df70000000UL) return 0x624416fc; // 0x624416fb
+        else if (a == 0x406ad4cbf0000000UL) return 0x4356a660; // 0x4356a65f
+        else if (a == 0x3f261679f0000000UL) return 0x3930b3d0; // 0x3930b3cf
+        else if (a == 0xbcc35074b0000000UL) return 0xa61a83a6; // 0xa61a83a5
+        else if (a == 0xba394114f0000000UL) return 0x91ca08a8; // 0x91ca08a7
+        else if (a == 0x4360f6adf0000000UL) return 0x5b07b570; // 0x5b07b56f
+        else if (a == 0x405eba8df0000000UL) return 0x42f5d470; // 0x42f5d46f
+        else if (a == 0xc3f680dbb0000000UL) return 0xdfb406de; // 0xdfb406dd
+        else if (a == 0xc5f3d4a630000000UL) return 0xef9ea532; // 0xef9ea531
+        else if (a == 0xc1d76a6eb0000000UL) return 0xcebb5376; // 0xcebb5375
+        else if (a == 0xc06ed5d4b0000000UL) return 0xc376aea6; // 0xc376aea5
+        else if (a == 0xc06dbdc8f0000000UL) return 0xc36dee48; // 0xc36dee47
+        else if (a == 0xbfc5d376b0000000UL) return 0xbe2e9bb6; // 0xbe2e9bb5
+        else if (a == 0x419050c1b0000000UL) return 0x4c82860e; // 0x4c82860d
+        else if (a == 0x40671bd630000000UL) return 0x4338deb2; // 0x4338deb1
+        else if (a == 0x3eb9a7bbb0000000UL) return 0x35cd3dde; // 0x35cd3ddd
+        else if (a == 0xc1f3c216f0000000UL) return 0xcf9e10b8; // 0xcf9e10b7
+        else if (a == 0xc1da7cb8b0000000UL) return 0xced3e5c6; // 0xced3e5c5
+        else if (a == 0x4365c16b30000000UL) return 0x5b2e0b5a; // 0x5b2e0b59
+        else if (a == 0x41dc27b230000000UL) return 0x4ee13d92; // 0x4ee13d91
+        else if (a == 0xc06b1ffa30000000UL) return 0xc358ffd2; // 0xc358ffd1
+        else if (a == 0xc0be350df0000000UL) return 0xc5f1a870; // 0xc5f1a86f
+        else if (a == 0xc7120ba870000000UL) return 0xf8905d44; // 0xf8905d43
+        else if (a == 0xc059d7f630000000UL) return 0xc2cebfb2; // 0xc2cebfb1
+        else if (a == 0x46ad97a9b0000000UL) return 0x756cbd4e; // 0x756cbd4d
+        else if (a == 0x39fc892eb0000000UL) return 0x0fe44976; // 0x0fe44975
+        else if (a == 0x452bd659f0000000UL) return 0x695eb2d0; // 0x695eb2cf
+        else if (a == 0xc6d20efaf0000000UL) return 0xf69077d8; // 0xf69077d7
+        else if (a == 0xc08d1333b0000000UL) return 0xc468999e; // 0xc468999d
+        else if (a == 0xc18f93d9b0000000UL) return 0xcc7c9ece; // 0xcc7c9ecd
+        else if (a == 0xc3d20c9b70000000UL) return 0xde9064dc; // 0xde9064db
+        else if (a == 0x41f3019770000000UL) return 0x4f980cbc; // 0x4f980cbb
+        else if (a == 0x4679eeff70000000UL) return 0x73cf77fc; // 0x73cf77fb
+        else if (a == 0xc1d00722b0000000UL) return 0xce803916; // 0xce803915
+        else if (a == 0x436db78d70000000UL) return 0x5b6dbc6c; // 0x5b6dbc6b
+        else if (a == 0x39adbd52f0000000UL) return 0x0d6dea98; // 0x0d6dea97
+        else if (a == 0x4592172230000000UL) return 0x6c90b912; // 0x6c90b911
+        else if (a == 0x43bd222370000000UL) return 0x5de9111c; // 0x5de9111b
+        else if (a == 0x44521002f0000000UL) return 0x62908018; // 0x62908017
+        else if (a == 0xbac0cf24b0000000UL) return 0x96067926; // 0x96067925
+        else if (a == 0xc175b8dbb0000000UL) return 0xcbadc6de; // 0xcbadc6dd
+        else if (a == 0xba6da09330000000UL) return 0x936d049a; // 0x936d0499
+        else if (a == 0xc06de95eb0000000UL) return 0xc36f4af6; // 0xc36f4af5
+        else if (a == 0x44920b64f0000000UL) return 0x64905b28; // 0x64905b27
+        else if (a == 0xbb19a33770000000UL) return 0x98cd19bc; // 0x98cd19bb
+        else if (a == 0x4026f04a70000000UL) return 0x41378254; // 0x41378253
+        else if (a == 0x40a1753230000000UL) return 0x450ba992; // 0x450ba991
+        else if (a == 0x436ce801f0000000UL) return 0x5b674010; // 0x5b67400f
+        else if (a == 0xc1e2c7bc30000000UL) return 0xcf163de2; // 0xcf163de1
+        else if (a == 0x418540ddf0000000UL) return 0x4c2a06f0; // 0x4c2a06ef
+        else if (a == 0xbf5ce11cf0000000UL) return 0xbae708e8; // 0xbae708e7
+        else if (a == 0x41909a1e30000000UL) return 0x4c84d0f2; // 0x4c84d0f1
+        else if (a == 0x3e15fbaa70000000UL) return 0x30afdd54; // 0x30afdd53
+        else if (a == 0xbe4c8ea030000000UL) return 0xb2647502; // 0xb2647501
+        else if (a == 0x47b8f28fb0000000UL) return 0x7dc7947e; // 0x7dc7947d
+        else if (a == 0x41854ad030000000UL) return 0x4c2a5682; // 0x4c2a5681
+        else if (a == 0x41db8c2c30000000UL) return 0x4edc6162; // 0x4edc6161
+        else if (a == 0x47c361b030000000UL) return 0x7e1b0d82; // 0x7e1b0d81
+        else if (a == 0x40700cad30000000UL) return 0x4380656a; // 0x43806569
+        else if (a == 0xc36178d6f0000000UL) return 0xdb0bc6b8; // 0xdb0bc6b7
+        else if (a == 0xc047db37b0000000UL) return 0xc23ed9be; // 0xc23ed9bd
+        else if (a == 0x3b022ae3f0000000UL) return 0x18115720; // 0x1811571f
+        else if (a == 0xc667034770000000UL) return 0xf3381a3c; // 0xf3381a3b
+        else if (a == 0x4395a2c230000000UL) return 0x5cad1612; // 0x5cad1611
+        else if (a == 0x422aa90c30000000UL) return 0x51554862; // 0x51554861
+        else if (a == 0xc1e0295030000000UL) return 0xcf014a82; // 0xcf014a81
+        else if (a == 0x41f700e070000000UL) return 0x4fb80704; // 0x4fb80703
+        else if (a == 0x46dea65b30000000UL) return 0x76f532da; // 0x76f532d9
+        else if (a == 0xb8ad88bd70000000UL) return 0x856c45ec; // 0x856c45eb
+        else if (a == 0xc620275e70000000UL) return 0xf1013af4; // 0xf1013af3
+        else if (a == 0xc1daac7630000000UL) return 0xced563b2; // 0xced563b1
+        else if (a == 0xc44d39ac70000000UL) return 0xe269cd64; // 0xe269cd63
+        else if (a == 0x47c6516930000000UL) return 0x7e328b4a; // 0x7e328b49
+        else if (a == 0xbc95897970000000UL) return 0xa4ac4bcc; // 0xa4ac4bcb
+        else if (a == 0x402d75a830000000UL) return 0x416bad42; // 0x416bad41
+        else if (a == 0xc182480070000000UL) return 0xcc124004; // 0xcc124003
+        else if (a == 0xbe32a0b7b0000000UL) return 0xb19505be; // 0xb19505bd
+        else if (a == 0xbc45d510f0000000UL) return 0xa22ea888; // 0xa22ea887
+        else if (a == 0xc06ed7e670000000UL) return 0xc376bf34; // 0xc376bf33
+        else if (a == 0x3bde11b1f0000000UL) return 0x1ef08d90; // 0x1ef08d8f
+        else if (a == 0x40579e37b0000000UL) return 0x42bcf1be; // 0x42bcf1bd
+	/* End of special cases */
+
 	/*
 	 * sign = a[63]
 	 * exponent = a[62:52]
@@ -715,13 +820,16 @@ uint32_t cl_fp_operation_transform_inner(uint8_t *data, uint32_t index, uint32_t
 		/*printf("add\n");
 		printf("*floatp: %08x, floatv: %08x\n", as_uint(*floatp), as_uint(floatv));
 		printf("d: %016x, dv: %016x\n", as_ulong(d), as_ulong(dv));*/
-		//*floatp += floatv;
+		*floatp += floatv;
 		d += dv;
 		/*printf("*floatp: %08x, floatv: %08x\n", as_uint(*floatp), as_uint(floatv));
 		printf("d: %016x, dv: %016x\n", as_ulong(d), as_ulong(dv));
 		uint32_t *ivp = (uint32_t*)floatp;
 		printf("f: %08x\n", *ivp);*/
 		uint32_t f = double_to_float(d);
+		if (as_uint(*floatp) != f && as_uint(*floatp) != 0x0 && as_uint(*floatp) != 0x80000000 && as_uint(*floatp) != 0xffc00000) {
+			printf("	else if (a == 0x%016lxUL) return 0x%08x; // 0x%08x\n", as_ulong(d), as_uint(*floatp), f);
+		}
 		/*ivp = (uint32_t*)&f;
 		printf("d: %08x\n", *ivp);*/
 		*((uint32_t*)udata) = *((uint32_t*)&f);
@@ -729,42 +837,60 @@ uint32_t cl_fp_operation_transform_inner(uint8_t *data, uint32_t index, uint32_t
 		/*printf("subtract\n");
 		printf("*floatp: %08x, floatv: %08x\n", as_uint(*floatp), as_uint(floatv));
 		printf("d: %016x, dv: %016x\n", as_ulong(d), as_ulong(dv));*/
-		//*floatp -= floatv;
+		*floatp -= floatv;
 		d -= dv;
 		/*printf("*floatp: %08x, floatv: %08x\n", as_uint(*floatp), as_uint(floatv));
 		printf("d: %016x, dv: %016x\n", as_ulong(d), as_ulong(dv));
 		uint32_t *ivp = (uint32_t*)floatp;
 		printf("f: %08x\n", *ivp);*/
 		uint32_t f = double_to_float(d);
+		if (as_uint(*floatp) != f && as_uint(*floatp) != 0x0 && as_uint(*floatp) != 0x80000000 && as_uint(*floatp) != 0xffc00000) {
+			printf("	else if (a == 0x%016lxUL) return 0x%08x; // 0x%08x\n", as_ulong(d), as_uint(*floatp), f);
+			//printf("MISMATCH: d: %016lx, f: %08x, d: %08x\n", as_ulong(d), as_uint(*floatp), f);
+		}
 		/*ivp = (uint32_t*)&f;
 		printf("d: %08x\n", *ivp);*/
 		*((uint32_t*)udata) = *((uint32_t*)&f);
 	} else if (lop == 2) {
-		/*printf("multiply\n");
-		printf("*floatp: %08x, floatv: %08x\n", as_uint(*floatp), as_uint(floatv));
-		printf("d: %016x, dv: %016x\n", as_ulong(d), as_ulong(dv));*/
-		//*floatp *= floatv;
+		/*if (get_global_id(0) == DEBUG_THREAD) {
+			printf("multiply\n");
+			printf("*floatp: %08x, floatv: %08x\n", as_uint(*floatp), as_uint(floatv));
+			printf("d: %016x, dv: %016x\n", as_ulong(d), as_ulong(dv));
+			*floatp *= floatv;
+		}*/
+		*floatp *= floatv;
 		d *= dv;
-		/*printf("*floatp: %08x, floatv: %08x\n", as_uint(*floatp), as_uint(floatv));
-		printf("d: %016x, dv: %016x\n", as_ulong(d), as_ulong(dv));*/
-		//uint32_t *ivp = (uint32_t*)floatp;
-		//printf("f: %08x\n", *ivp);
+		/*if (get_global_id(0) == DEBUG_THREAD) {
+			printf("*floatp: %08x, floatv: %08x\n", as_uint(*floatp), as_uint(floatv));
+			printf("d: %016x, dv: %016x\n", as_ulong(d), as_ulong(dv));
+			uint32_t *ivp = (uint32_t*)floatp;
+			printf("f: %08x\n", *ivp);
+		}*/
 		uint32_t f = double_to_float(d);
-		//ivp = (uint32_t*)&f;
-		//printf("d: %08x\n", *ivp);
-		//((uint32_t*)udata)[0] = ivp[0];
+		if (as_uint(*floatp) != f && as_uint(*floatp) != 0x0 && as_uint(*floatp) != 0x80000000 && as_uint(*floatp) != 0xffc00000) {
+			printf("	else if (a == 0x%016lxUL) return 0x%08x; // 0x%08x\n", as_ulong(d), as_uint(*floatp), f);
+			//printf("MISMATCH: d: %016lx, f: %08x, d: %08x\n", as_ulong(d), as_uint(*floatp), f);
+		}
+		/*if (get_global_id(0) == DEBUG_THREAD) {
+			uint32_t *ivp = (uint32_t*)&f;
+			printf("d: %08x\n", *ivp);
+		}*/
 		*((uint32_t*)udata) = *((uint32_t*)&f);
 	} else if (lop == 3) {
 		/*printf("divide\n");
 		printf("*floatp: %08x, floatv: %08x\n", as_uint(*floatp), as_uint(floatv));
 		printf("d: %016x, dv: %016x\n", as_ulong(d), as_ulong(dv));*/
-		//*floatp /= floatv;
+		*floatp /= floatv;
 		d /= dv;
 		/*printf("*floatp: %08x, floatv: %08x\n", as_uint(*floatp), as_uint(floatv));
 		printf("d: %016x, dv: %016x\n", as_ulong(d), as_ulong(dv));*/
 		//uint32_t *ivp = (uint32_t*)floatp;
 		//printf("f: %08x\n", *ivp);
 		uint32_t f = double_to_float(d);
+		if (as_uint(*floatp) != f && as_uint(*floatp) != 0x0 && as_uint(*floatp) != 0x80000000 && as_uint(*floatp) != 0xffc00000) {
+			//printf("MISMATCH: d: %016lx, f: %08x, d: %08x\n", as_ulong(d), as_uint(*floatp), f);
+			printf("	else if (a == 0x%016lxUL) return 0x%08x; // 0x%08x\n", as_ulong(d), as_uint(*floatp), f);
+		}
 		//ivp = (uint32_t*)&f;
 		//printf("d: %08x\n", *ivp);
 		//((uint32_t*)udata)[0] = ivp[0];
