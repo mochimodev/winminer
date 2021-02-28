@@ -9,7 +9,7 @@
  */
 
 #define DEBUG_TILEP
-#define DEBUG_FLOAT
+//#define DEBUG_FLOAT
 
 #pragma OPENCL EXTENSION cl_khr_byte_addressable_store : enable
 
@@ -235,7 +235,7 @@ void cl_gen_tile(uint32_t index, __global uint8_t *g_map, uint8_t debug, __globa
 	   /* Hash the current row to the next, if not at the end */
 	   /* Setup nighthash with a transform of the current row */
 #ifdef DEBUG_TILEP
-	   if (index == 0 && i >= 544 && i <= 576) {
+	   if (index == 1 && i >= 100 && i <= 300) {
 		   printf("tilep %d, algotype: %d\n", i, nighthash.algo_type);
 		   printf32("", (tilep+i));
 	   }
@@ -246,7 +246,7 @@ void cl_gen_tile(uint32_t index, __global uint8_t *g_map, uint8_t debug, __globa
 		   ((global uint64_t*)(tilep+i))[z] = ((uint64_t*)(local_out))[z];
 	   }
 #ifdef DEBUG_TILEP
-	   if (index == 0 && i >= 544 && i <= 576) {
+	   if (index == 1 && i >= 100 && i <= 300) {
 		   printf("tilep %d, algotype: %d\n", i, nighthash.algo_type);
 		   printf32("", (tilep+i));
 	   }
@@ -292,7 +292,7 @@ void cl_gen_tile(uint32_t index, __global uint8_t *g_map, uint8_t debug, __globa
 __kernel void cl_build_map(__global uint8_t *g_map, __global uint8_t *c_phash, uint32_t start_index) {
    uint32_t thread = get_global_id(0) + start_index;
    //if (thread < MAP) {
-   if (thread == 0) {
+   if (thread < 2) {
       cl_gen_tile(thread, g_map, /*thread == 32 ? 1 :*/ 0 , c_phash);
    }
 
@@ -428,6 +428,7 @@ __kernel void cl_find_peach(uint32_t threads, __global uint8_t *g_map,
  *
  */
 
+#if 0
 double float_to_double(uint32_t sp) {
 	// Normals and denormals
 	short sign = (sp & (1<<31)) ? -1 : +1;
@@ -465,7 +466,10 @@ double float_to_double(uint32_t sp) {
 	//print("dval2:", hex(dval2))
 	return as_double(dval2);
 }
+#endif
 
+
+#if 0
 uint32_t double_to_float(double d) {
     // Normals and denormals
 	ulong dp = as_ulong(d);
@@ -488,6 +492,152 @@ uint32_t double_to_float(double d) {
     fval2 |= (mantissa & 0x7fffff);
 
 	return fval2;
+}
+#endif
+
+double float_to_double(uint32_t a) {
+	uint64_t z = 0;
+	uint64_t z_e = 0;
+	uint64_t z_m = 0;
+
+	/* Sign bit */
+	uint64_t sign = 0;
+	if (a & (1 << 31)) {
+		sign = (1UL << 63);
+	}
+	z |= sign;
+
+	uint32_t a_exp = (a >> 23) & 0xff;
+	uint64_t a_frac = a & 0x7fffff;
+
+	z = z | (a_frac << 29);
+
+
+	/*printf("a_exp = %d\n", a_exp);
+	printf("a_frac = %lu\n", a_frac);*/
+	if (a_exp == 0) {
+		//printf("a_exp == 0\n");
+		if (a & 0xffffff) {
+			z_e = 897;
+			z_m = a_frac << 29;
+			//printf("z_m: %016lx\n", z_m);
+
+			/* Normalize */
+			for (;;) {
+				//printf("z_m: %016lx\n", z_m);
+				if (z_m & (1UL<<52)) {
+					z = sign;
+					/*printf("z: %016lx\n", z);
+					printf("z_e: %ld, %08lx\n", z_e, z_e);*/
+					z = z | (z_e << 52);
+					//printf("z: %016lx\n", z);
+					z = z | (z_m & 0xfffffffffffff);
+					//printf("z: %016lx\n", z);
+					break;
+				} else {
+					z_m = (z_m & 0xfffffffffffff) << 1;
+					z_e = z_e - 1;
+					//printf("z_e: %ld, %08lx\n", z_e, z_e);
+				}
+			}
+			/* End normalize */
+		}
+	} else if (a_exp == 255) {
+		//printf("a_exp == 255\n");
+		z = z | (2047UL << 52);
+	} else {
+		//printf("other a_exp\n");
+		//printf("z before: %016lx\n", z);
+		uint64_t exp = (a_exp - 127) + 1023;
+		uint64_t exp_shift = exp << 52;
+		//printf("exp: %lu\n", exp<<52);
+		z = z | exp_shift;
+		//printf("z after: %016lx\n", z);
+	}
+	return *(double*)((void*)&z);
+}
+
+uint32_t double_to_float(double d) {
+	uint64_t a = *(uint64_t*)((void*)&d);
+	uint32_t z = 0;
+	uint32_t z_e = 0;
+	uint32_t z_m = 0;
+	uint32_t sticky = 0;
+	uint32_t guard = 0;
+	uint32_t round = 0;
+
+	/*
+	 * sign = a[63]
+	 * exponent = a[62:52]
+	 * fraction = a[51:0]
+	 */
+
+	/* Sign bit */
+	if (a & ((uint64_t)1<<63)) {
+		z |= (1<<31);
+	}
+
+	uint32_t a_exp = ((a >> 52) & 0x7ff);
+	uint64_t a_frac = a & 0xfffffffffffff;
+	uint32_t a_frac29 = a_frac >> 29;
+	/*printf("a_exp: %d\n", a_exp);
+	printf("a_frac29: %08x\n", a_frac29);*/
+
+	if (a_exp == 0) {
+		/* z is 0 except for sign bit */
+	} else if (a_exp < 897) {
+		/* z_exp is 0 */
+		z_m = (1<<23) | (a_frac29);
+		z_e = a_exp;
+		guard = a & (1<<28);
+		round = a & (1<<27);
+		sticky = ((a & 0x7ffffff) != 0);
+
+		/* Denormalize */
+		for (;;) {
+			//printf("denormalize\n");
+			if (z_e == 897 || (z_m == 0 && guard == 0)) {
+				if (guard && (round || sticky)) {
+					//printf("guard && (round || sticky)\n");
+					z |= (z_m + 1) & 0x7fffff;
+				} else {
+					//printf("not guard\n");
+					z |= z_m & 0x7fffff;
+				}
+				/*printf("z: %08x\n", z);
+				printf("z_m: %08x\n", z_m);
+				printf("z_e: %08x\n", z_e);*/
+				break;
+			} else {
+				z_e = z_e + 1;
+				sticky = sticky | round;
+				round = guard;
+				guard = z_m & 0x1;
+				z_m = z_m >> 1;
+			}
+		}
+		/* End denormalize */
+	} else if (a_exp == 2047) {
+		z |= (255 << 23);
+		if (a_frac) {
+			z |= (1<<22);
+		}
+	} else if (a_exp > 1150) {
+		z |= (255 << 23);
+	} else {
+		uint32_t exp = ((a_exp - 1023) + 127);
+		if ((a & (1<<28)) && ( (a & (1<<27)) || (a & 0x7ffffff) )) {
+			uint32_t frac = (a_frac29 + 1);
+			if (frac & (1<<23)) {
+				exp = exp + 1;
+			}
+			z |= (exp << 23) | (frac & 0x7fffff);
+		} else {
+			z |= (exp << 23) | ((a_frac29) & 0x7fffff);
+		}
+	}
+
+	return z;
 }
 
 uint32_t cl_fp_operation_transform_inner(uint8_t *data, uint32_t index, uint32_t op) {
@@ -539,15 +689,19 @@ uint32_t cl_fp_operation_transform_inner(uint8_t *data, uint32_t index, uint32_t
 
 	/* Cast operand to float */
 	floatv = operand;
-	dv = operand;
+	//dv = float_to_double(as_uint(operand));
+	dv = float_to_double(as_uint(floatv));
 #ifdef DEBUG_FLOAT
 	if (index == 0) printf("floatv: %e, dv: %e\n", floatv, dv);
 #endif
 
 	/* Replace pre-operation NaN with index */
-	if (isnan(*floatp)) *floatp = index;
+	if (isnan(*floatp)) {
+		*floatp = index;
+	}
 
-	d = *floatp;
+	//d = *floatp;
+	d = float_to_double(*(uint32_t*)udata);
 #ifdef DEBUG_FLOAT
 	if (index == 0) printf("*floatp: %e, d: %e\n", *floatp, d);
 #endif
@@ -558,85 +712,75 @@ uint32_t cl_fp_operation_transform_inner(uint8_t *data, uint32_t index, uint32_t
 	if (index == 0) printf("lop: %d\n", lop);
 #endif
 	if (lop == 0) {
-		*floatp += floatv;
+		/*printf("add\n");
+		printf("*floatp: %08x, floatv: %08x\n", as_uint(*floatp), as_uint(floatv));
+		printf("d: %016x, dv: %016x\n", as_ulong(d), as_ulong(dv));*/
+		//*floatp += floatv;
 		d += dv;
-#if 1
-		ulong lv = as_ulong(d);
-		uint exponent = (lv & 0x7ff0000000000000) >> 52;
-		int sh      = exponent - 897; // (exponent - 1023) + 126
-		if (sh < 0) {
-			uint8_t *ivp = (uint8_t*)floatp;
-			printf("r: ivp0[0]: %d, ivp[1]: %d, ivp[2]: %d, ivp[3]: %d\n", ivp[0], ivp[1], ivp[2], ivp[3]);
-			uint32_t f = double_to_float(d);
-			ivp = (uint8_t*)&f;
-			printf("1: ivp0[0]: %d, ivp[1]: %d, ivp[2]: %d, ivp[3]: %d\n", ivp[0], ivp[1], ivp[2], ivp[3]);
-			udata[0] = ivp[0];
-			udata[1] = ivp[1];
-			udata[2] = ivp[2];
-			udata[3] = ivp[3];
-		}
-#endif
+		/*printf("*floatp: %08x, floatv: %08x\n", as_uint(*floatp), as_uint(floatv));
+		printf("d: %016x, dv: %016x\n", as_ulong(d), as_ulong(dv));
+		uint32_t *ivp = (uint32_t*)floatp;
+		printf("f: %08x\n", *ivp);*/
+		uint32_t f = double_to_float(d);
+		/*ivp = (uint32_t*)&f;
+		printf("d: %08x\n", *ivp);*/
+		*((uint32_t*)udata) = *((uint32_t*)&f);
 	} else if (lop == 1) {
-		*floatp -= floatv;
+		/*printf("subtract\n");
+		printf("*floatp: %08x, floatv: %08x\n", as_uint(*floatp), as_uint(floatv));
+		printf("d: %016x, dv: %016x\n", as_ulong(d), as_ulong(dv));*/
+		//*floatp -= floatv;
 		d -= dv;
-#if 0
-		ulong lv = as_ulong(d);
-		uint exponent = (lv & 0x7ff0000000000000) >> 52;
-		int sh      = exponent - 897; // (exponent - 1023) + 126
-		if (sh < 0) {
-			//printf("r: ivp0[0]: %d, ivp[1]: %d, ivp[2]: %d, ivp[3]: %d\n", ivp[0], ivp[1], ivp[2], ivp[3]);
-			uint32_t f = double_to_float(d);
-			uint8_t *ivp = (uint8_t*)&f;
-			udata[0] = ivp[0];
-			udata[1] = ivp[1];
-			udata[2] = ivp[2];
-			udata[3] = ivp[3];
-		}
-#endif
+		/*printf("*floatp: %08x, floatv: %08x\n", as_uint(*floatp), as_uint(floatv));
+		printf("d: %016x, dv: %016x\n", as_ulong(d), as_ulong(dv));
+		uint32_t *ivp = (uint32_t*)floatp;
+		printf("f: %08x\n", *ivp);*/
+		uint32_t f = double_to_float(d);
+		/*ivp = (uint32_t*)&f;
+		printf("d: %08x\n", *ivp);*/
+		*((uint32_t*)udata) = *((uint32_t*)&f);
 	} else if (lop == 2) {
-		*floatp *= floatv;
+		/*printf("multiply\n");
+		printf("*floatp: %08x, floatv: %08x\n", as_uint(*floatp), as_uint(floatv));
+		printf("d: %016x, dv: %016x\n", as_ulong(d), as_ulong(dv));*/
+		//*floatp *= floatv;
 		d *= dv;
-
-#if 0
-		ulong lv = as_ulong(d);
-		uint exponent = (lv & 0x7ff0000000000000) >> 52;
-		int sh      = exponent - 897; // (exponent - 1023) + 126
-		if (sh < 0) {
-			//printf("r: ivp0[0]: %d, ivp[1]: %d, ivp[2]: %d, ivp[3]: %d\n", ivp[0], ivp[1], ivp[2], ivp[3]);
-			uint32_t f = double_to_float(d);
-			uint8_t *ivp = (uint8_t*)&f;
-			udata[0] = ivp[0];
-			udata[1] = ivp[1];
-			udata[2] = ivp[2];
-			udata[3] = ivp[3];
-		}
-#endif
+		/*printf("*floatp: %08x, floatv: %08x\n", as_uint(*floatp), as_uint(floatv));
+		printf("d: %016x, dv: %016x\n", as_ulong(d), as_ulong(dv));*/
+		//uint32_t *ivp = (uint32_t*)floatp;
+		//printf("f: %08x\n", *ivp);
+		uint32_t f = double_to_float(d);
+		//ivp = (uint32_t*)&f;
+		//printf("d: %08x\n", *ivp);
+		//((uint32_t*)udata)[0] = ivp[0];
+		*((uint32_t*)udata) = *((uint32_t*)&f);
 	} else if (lop == 3) {
-		*floatp /= floatv;
+		/*printf("divide\n");
+		printf("*floatp: %08x, floatv: %08x\n", as_uint(*floatp), as_uint(floatv));
+		printf("d: %016x, dv: %016x\n", as_ulong(d), as_ulong(dv));*/
+		//*floatp /= floatv;
 		d /= dv;
-		ulong lv = as_ulong(d);
-		uint exponent = (lv & 0x7ff0000000000000) >> 52;
-		int sh      = exponent - 897; // (exponent - 1023) + 126
-
-		if (sh < 0) {
-			//uint8_t *ivp = (uint8_t*)floatp;
-			//printf("r: ivp0[0]: %d, ivp[1]: %d, ivp[2]: %d, ivp[3]: %d\n", ivp[0], ivp[1], ivp[2], ivp[3]);
-			uint32_t f = double_to_float(d);
-			uint8_t *ivp = (uint8_t*)&f;
-			//printf("1: ivp0[0]: %d, ivp[1]: %d, ivp[2]: %d, ivp[3]: %d\n", ivp[0], ivp[1], ivp[2], ivp[3]);
-			udata[0] = ivp[0];
-			udata[1] = ivp[1];
-			udata[2] = ivp[2];
-			udata[3] = ivp[3];
-		}
-
+		/*printf("*floatp: %08x, floatv: %08x\n", as_uint(*floatp), as_uint(floatv));
+		printf("d: %016x, dv: %016x\n", as_ulong(d), as_ulong(dv));*/
+		//uint32_t *ivp = (uint32_t*)floatp;
+		//printf("f: %08x\n", *ivp);
+		uint32_t f = double_to_float(d);
+		//ivp = (uint32_t*)&f;
+		//printf("d: %08x\n", *ivp);
+		//((uint32_t*)udata)[0] = ivp[0];
+		*((uint32_t*)udata) = *((uint32_t*)&f);
 	}
 #ifdef DEBUG_FLOAT
 	if (index == 0) printf("*floatp: %e, d: %e\n", *floatp, d);
 #endif
 
 	/* Replace post-operation NaN with index */
-	if (isnan(*floatp)) *floatp = index;
+	if (isnan(*floatp)) {
+		*floatp = index;
+	}
+		
+
+
 #ifdef DEBUG_FLOAT
 	if (index == 0) printf("*floatp: %e\n", *floatp);
 #endif

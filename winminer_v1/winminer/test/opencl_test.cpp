@@ -276,10 +276,12 @@ int trigg_init_cl(uint8_t  difficulty, uint8_t *blockNumber) {
 			printf("%s:%d: clEnqueueReadBuffer failed. Error: %d\n", __FILE__, __LINE__, err);
 		}
 		FILE *fp = fopen("map.dat", "wb");
-		fwrite(full_map, 1, (size_t)MAP_LENGTH, fp);
+		//fwrite(full_map, 1, (size_t)MAP_LENGTH, fp);
+		fwrite(full_map, 1, (size_t)(1*1024*1024), fp);
 		fclose(fp);
 		free(full_map);
 
+		printf("1MB xxxfull map dumped\n");
 
 
 		ctx[i].d_found = clCreateBuffer(ctx[i].context, CL_MEM_WRITE_ONLY, 4, NULL, &err);
@@ -367,6 +369,7 @@ int main() {
 		cl_int err;
 
 
+#if 0
             	gettimeofday(&t_start, NULL);
 		err = clSetKernelArg(ctx[i].k_peach, 5, 1, &diff);
 		if (CL_SUCCESS != err) {
@@ -433,6 +436,7 @@ int main() {
 			printf("%02x ", ctx[i].seed[j]);
 		}
 		printf("\n");
+#endif
 
 		clReleaseMemObject(ctx[i].d_map);
 		clReleaseMemObject(ctx[i].d_phash);
