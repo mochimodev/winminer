@@ -60,10 +60,7 @@ uint32_t double_to_float(uint64_t a) {
 			DEBUG_PRINTF("z_m: %08x\n", z_m);
 			if (z_e == 897 || (z_m == 0 && guard == 0)) {
 				DEBUG_PRINTF("guard: %d, round: %d, sticky: %d\n", guard, round, sticky);
-				if (guard && (round || sticky)) {
-					DEBUG_PRINTF("guard && (round || sticky)\n");
-					z |= (z_m + 1) & 0x7fffff;
-				} else if (guard && (z_m & 0x1)) {
+				if (guard && (round || sticky || (z_m & 0x1))) {
 					DEBUG_PRINTF("guard && (round || sticky)\n");
 					z |= (z_m + 1) & 0x7fffff;
 				} else {

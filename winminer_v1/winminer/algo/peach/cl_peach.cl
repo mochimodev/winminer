@@ -428,73 +428,6 @@ __kernel void cl_find_peach(uint32_t threads, __global uint8_t *g_map,
  *
  */
 
-#if 0
-double float_to_double(uint32_t sp) {
-	// Normals and denormals
-	short sign = (sp & (1<<31)) ? -1 : +1;
-	//print("Sign:", "-" if (sp_hex & (1<<31)) else "+");
-	int exponent = (sp & 0x7f800000) >> 23;
-	//print("Exponent:", exponent)
-	//print("bin:", bin(exponent))
-	uint64_t mantissa = (sp & 0x7fffff);
-	mantissa <<= 29;
-	for (int i = 0; i < 23; i++) {
-		if ( (mantissa & (1<<51)) == 0) {
-			mantissa <<= 1;
-			exponent -= 1;
-		} else {
-			break;
-		}
-	}
-	exponent += 1023 - 127;
-
-	//de = exponent - 1023;
-	//print("ex:", de, (de - (-1023)))
-	//print("bin mantissa:", bin(mantissa))
-	//print("hex mantissa:", hex(mantissa))
-	//fmantissa = float(mantissa) / (1<<52);
-	//if (exponent != 0) {
-		//fmantissa += 1;
-	//}
-	//print("Mantissa:", fmantissa)
-	//dval = sign*(2**(exponent-1023))*fmantissa;
-	//print(dval)
-	//print("double hex:", double_to_hex(dval))
-	uint64_t dval2 = ((sign == -1) << 63);
-	dval2 |= exponent << 52;
-	dval2 |= mantissa;
-	//print("dval2:", hex(dval2))
-	return as_double(dval2);
-}
-#endif
-
-
-#if 0
-uint32_t double_to_float(double d) {
-    // Normals and denormals
-	ulong dp = as_ulong(d);
-	uint sign        = (dp & 0x8000000000000000) >> 32;
-    uint dp_exponent = (dp & 0x7ff0000000000000) >> 52;
-    int exponent     = dp_exponent - 1023 + 127;
-    uint mantissa    = (dp & 0x000fffffe0000000) >> 29;
-	int sh = dp_exponent - 897; // exponent - 1023 + 126
-	printf("sh: %d\n", sh);
-    if (sh < 0) {
-        mantissa |= (1<<23);
-        mantissa >>= (-sh-1);
-		mantissa += 1;
-		mantissa >>= 1;
-        exponent = 0;
-	}
-	printf("sign: %d, mantissa: %d, exponent: %d\n", sign, mantissa, exponent);
-    uint32_t fval2 = sign;
-    fval2 |= (exponent & 0xff) << 23;
-    fval2 |= (mantissa & 0x7fffff);
-
-	return fval2;
-}
-#endif
-
 double float_to_double(uint32_t a) {
 	uint64_t z = 0;
 	uint64_t z_e = 0;
@@ -511,7 +444,6 @@ double float_to_double(uint32_t a) {
 	uint64_t a_frac = a & 0x7fffff;
 
 	z = z | (a_frac << 29);
-
 
 	if (a_exp == 0) {
 		if (a & 0xffffff) {
@@ -580,9 +512,7 @@ uint32_t double_to_float(double d) {
 		/* Denormalize */
 		for (;;) {
 			if (z_e == 897 || (z_m == 0 && guard == 0)) {
-				if (guard && (round || sticky)) {
-					z |= (z_m + 1) & 0x7fffff;
-				} else if (guard && (z_m & 0x1)) {
+				if (guard && (round || sticky || (z_m & 0x1))) {
 					z |= (z_m + 1) & 0x7fffff;
 				} else {
 					z |= z_m & 0x7fffff;
@@ -687,7 +617,6 @@ uint32_t cl_fp_operation_transform_inner(uint8_t *data, uint32_t index, uint32_t
 		*floatp = index;
 	}
 
-	//d = *floatp;
 	d = float_to_double(*(uint32_t*)udata);
 #ifdef DEBUG_FLOAT
 	if (index == 0) printf("*floatp: %e, d: %e\n", *floatp, d);
@@ -699,36 +628,36 @@ uint32_t cl_fp_operation_transform_inner(uint8_t *data, uint32_t index, uint32_t
 	if (index == 0) printf("lop: %d\n", lop);
 #endif
 	if (lop == 0) {
-		*floatp += floatv;
+		//*floatp += floatv;
 		d += dv;
 		uint32_t f = double_to_float(d);
-		if (as_uint(*floatp) != f && as_uint(*floatp) != 0x0 && as_uint(*floatp) != 0x80000000 && as_uint(*floatp) != 0xffc00000 && !isnan(*floatp)) {
+		/*if (as_uint(*floatp) != f && as_uint(*floatp) != 0x0 && as_uint(*floatp) != 0x80000000 && as_uint(*floatp) != 0xffc00000 && !isnan(*floatp)) {
 			printf("	TEST(double_to_float(0x%016lxUL), 0x%08x);\n", as_ulong(d), as_uint(*floatp));
-		}
+		}*/
 		*((uint32_t*)udata) = *((uint32_t*)&f);
 	} else if (lop == 1) {
-		*floatp -= floatv;
+		//*floatp -= floatv;
 		d -= dv;
 		uint32_t f = double_to_float(d);
-		if (as_uint(*floatp) != f &&  as_uint(*floatp) != 0x0 && as_uint(*floatp) != 0x80000000 && as_uint(*floatp) != 0xffc00000 && !isnan(*floatp)) {
+		/*if (as_uint(*floatp) != f &&  as_uint(*floatp) != 0x0 && as_uint(*floatp) != 0x80000000 && as_uint(*floatp) != 0xffc00000 && !isnan(*floatp)) {
 			printf("	TEST(double_to_float(0x%016lxUL), 0x%08x);\n", as_ulong(d), as_uint(*floatp));
-		}
+		}*/
 		*((uint32_t*)udata) = *((uint32_t*)&f);
 	} else if (lop == 2) {
-		*floatp *= floatv;
+		//*floatp *= floatv;
 		d *= dv;
 		uint32_t f = double_to_float(d);
-		if (as_uint(*floatp) != f && as_uint(*floatp) != 0x0 && as_uint(*floatp) != 0x80000000 && as_uint(*floatp) != 0xffc00000 && !isnan(*floatp)) {
+		/*if (as_uint(*floatp) != f && as_uint(*floatp) != 0x0 && as_uint(*floatp) != 0x80000000 && as_uint(*floatp) != 0xffc00000 && !isnan(*floatp)) {
 			printf("	TEST(double_to_float(0x%016lxUL), 0x%08x);\n", as_ulong(d), as_uint(*floatp));
-		}
+		}*/
 		*((uint32_t*)udata) = *((uint32_t*)&f);
 	} else if (lop == 3) {
-		*floatp /= floatv;
+		//*floatp /= floatv;
 		d /= dv;
 		uint32_t f = double_to_float(d);
-		if (as_uint(*floatp) != f && as_uint(*floatp) != 0x0 && as_uint(*floatp) != 0x80000000 && as_uint(*floatp) != 0xffc00000 && !isnan(*floatp)) {
+		/*if (as_uint(*floatp) != f && as_uint(*floatp) != 0x0 && as_uint(*floatp) != 0x80000000 && as_uint(*floatp) != 0xffc00000 && !isnan(*floatp)) {
 			printf("	TEST(double_to_float(0x%016lxUL), 0x%08x);\n", as_ulong(d), as_uint(*floatp));
-		}
+		}*/
 		*((uint32_t*)udata) = *((uint32_t*)&f);
 	}
 #ifdef DEBUG_FLOAT
