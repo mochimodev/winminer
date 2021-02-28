@@ -606,7 +606,7 @@ uint32_t cl_fp_operation_transform_inner(uint8_t *data, uint32_t index, uint32_t
 
 	/* Cast operand to float */
 	floatv = operand;
-	//dv = float_to_double(as_uint(operand));
+	//dv = float_to_double(double_to_float(float_to_double(operand)));
 	dv = float_to_double(as_uint(floatv));
 #ifdef DEBUG_FLOAT
 	if (index == 0) printf("floatv: %e, dv: %e\n", floatv, dv);
@@ -788,7 +788,7 @@ uint32_t cl_fp_operation_notransform_1060B(uint8_t *data, uint32_t index) {
 
       /* Perform predetermined floating point operation */
       uint lop = op & 3;
-      if (lop == 0) {
+      /*if (lop == 0) {
             floatv1 += floatv;
       } else if (lop == 1) {
             floatv1 -= floatv;
@@ -796,7 +796,24 @@ uint32_t cl_fp_operation_notransform_1060B(uint8_t *data, uint32_t index) {
             floatv1 *= floatv;
       } else if (lop == 3) {
             floatv1 /= floatv;
-      }
+      }*/
+
+      double d = float_to_double(as_uint(floatv1));
+      double dv = float_to_double(as_uint(floatv));
+
+	if (lop == 0) {
+		d += dv;
+		floatv1 = as_float(double_to_float(d));
+	} else if (lop == 1) {
+		d -= dv;
+		floatv1 = as_float(double_to_float(d));
+	} else if (lop == 2) {
+		d *= dv;
+		floatv1 = as_float(double_to_float(d));
+	} else if (lop == 3) {
+		d /= dv;
+		floatv1 = as_float(double_to_float(d));
+	}
 
       /* Replace post-operation NaN with index */
       if (isnan(floatv1)) floatv1 = index;
