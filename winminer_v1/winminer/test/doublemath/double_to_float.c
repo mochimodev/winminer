@@ -13,7 +13,7 @@ uint8_t debug = 0;
 		debug = 1; \
 		a; \
 		debug = 0; \
-		exit(1); \
+		/*exit(1);*/ \
 	} \
 }
 
@@ -57,9 +57,13 @@ uint32_t double_to_float(uint64_t a) {
 		/* Denormalize */
 		for (;;) {
 			//printf("denormalize\n");
+			DEBUG_PRINTF("z_m: %08x\n", z_m);
 			if (z_e == 897 || (z_m == 0 && guard == 0)) {
 				DEBUG_PRINTF("guard: %d, round: %d, sticky: %d\n", guard, round, sticky);
 				if (guard && (round || sticky)) {
+					DEBUG_PRINTF("guard && (round || sticky)\n");
+					z |= (z_m + 1) & 0x7fffff;
+				} else if (guard && (z_m & 0x1)) {
 					DEBUG_PRINTF("guard && (round || sticky)\n");
 					z |= (z_m + 1) & 0x7fffff;
 				} else {

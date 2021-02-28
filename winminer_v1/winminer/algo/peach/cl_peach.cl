@@ -582,6 +582,8 @@ uint32_t double_to_float(double d) {
 			if (z_e == 897 || (z_m == 0 && guard == 0)) {
 				if (guard && (round || sticky)) {
 					z |= (z_m + 1) & 0x7fffff;
+				} else if (guard && (z_m & 0x1)) {
+					z |= (z_m + 1) & 0x7fffff;
 				} else {
 					z |= z_m & 0x7fffff;
 				}

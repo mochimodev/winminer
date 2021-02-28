@@ -276,12 +276,11 @@ int trigg_init_cl(uint8_t  difficulty, uint8_t *blockNumber) {
 			printf("%s:%d: clEnqueueReadBuffer failed. Error: %d\n", __FILE__, __LINE__, err);
 		}
 		FILE *fp = fopen("map.dat", "wb");
-		//fwrite(full_map, 1, (size_t)MAP_LENGTH, fp);
-		fwrite(full_map, 1, (size_t)(1*1024*1024), fp);
+		fwrite(full_map, 1, (size_t)MAP_LENGTH, fp);
 		fclose(fp);
 		free(full_map);
 
-		printf("1MB xxxfull map dumped\n");
+		printf("full map dumped\n");
 
 
 		ctx[i].d_found = clCreateBuffer(ctx[i].context, CL_MEM_WRITE_ONLY, 4, NULL, &err);
