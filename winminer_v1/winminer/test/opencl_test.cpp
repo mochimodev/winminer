@@ -3,6 +3,7 @@
 #include <stdint.h>
 #include <unistd.h>
 #include <sys/time.h>
+#include <string.h>
 #define CL_TARGET_OPENCL_VERSION 120
 #define CL_USE_DEPRECATED_OPENCL_1_2_APIS
 #define __CL_ENABLE_EXCEPTIONS
@@ -18,6 +19,8 @@
 #define MAP                       1048576
 #define MAP_LENGTH    (TILE_LENGTH * MAP)
 #define JUMP                            8
+
+#define USE_BINARY
 
 cl_uint num_devices = 0;
 cl_platform_id platform_id = NULL;
@@ -51,6 +54,112 @@ static size_t block = 256;
 //static size_t block = 1;
 //static size_t threads = 128;
 //static size_t block = 128;
+
+int write_file(const char *name, const unsigned char *content, size_t size) {
+  FILE *fp = fopen(name, "wb+");
+  if (!fp) {
+    return -1;
+  }
+  fwrite(content, size, 1, fp);
+  fclose(fp);
+  return 0;
+}
+
+cl_int write_binaries(cl_program program, unsigned num_devices,
+                      cl_uint platform_idx) {
+  unsigned i;
+  cl_int err = CL_SUCCESS;
+  size_t *binaries_size = NULL;
+  unsigned char **binaries_ptr = NULL;
+
+  // Read the binaries size
+  size_t binaries_size_alloc_size = sizeof(size_t) * num_devices;
+  binaries_size = (size_t *)malloc(binaries_size_alloc_size);
+  if (!binaries_size) {
+    err = CL_OUT_OF_HOST_MEMORY;
+    return -1;
+  }
+
+  err = clGetProgramInfo(program, CL_PROGRAM_BINARY_SIZES,
+                         binaries_size_alloc_size, binaries_size, NULL);
+  if (err != CL_SUCCESS) {
+    return -1;
+  }
+
+  // Read the binaries
+  size_t binaries_ptr_alloc_size = sizeof(unsigned char *) * num_devices;
+  binaries_ptr = (unsigned char **)malloc(binaries_ptr_alloc_size);
+  if (!binaries_ptr) {
+    err = CL_OUT_OF_HOST_MEMORY;
+    return -1;
+  }
+  memset(binaries_ptr, 0, binaries_ptr_alloc_size);
+  for (i = 0; i < num_devices; ++i) {
+    binaries_ptr[i] = (unsigned char *)malloc(binaries_size[i]);
+    if (!binaries_ptr[i]) {
+      err = CL_OUT_OF_HOST_MEMORY;
+      return -1;
+    }
+  }
+
+  err = clGetProgramInfo(program, CL_PROGRAM_BINARIES, binaries_ptr_alloc_size,
+                         binaries_ptr, NULL);
+  if (err != CL_SUCCESS) {
+    return -1;
+  }
+
+  // Write the binaries to file
+  for (i = 0; i < num_devices; ++i) {
+    // Create output file name
+    char filename[128];
+    snprintf(filename, sizeof(filename), "cl-out_%u-%u.bin",
+             (unsigned)platform_idx, (unsigned)i);
+
+    // Write the binary to the output file
+    write_file(filename, binaries_ptr[i], binaries_size[i]);
+  }
+
+  // Free the return value buffer
+  if (binaries_ptr) {
+    for (i = 0; i < num_devices; ++i) {
+      free(binaries_ptr[i]);
+    }
+    free(binaries_ptr);
+  }
+  free(binaries_size);
+
+  return err;
+}
+
+
+cl_program opencl_load_binary(cl_context context, uint8_t num_devices, cl_device_id *devices, const char *filename, const char *options) {
+	FILE *fp = fopen(filename, "r");
+	if (!fp) {
+		fprintf(stderr, "Failed to load kernel.\n");
+		exit(1);
+	}
+	char *src = (char*)malloc(10*1024*1024);
+	size_t dwSize = fread( src, 1, 10*1024*1024, fp);
+	printf("Loaded binary size: %lu\n", dwSize);
+	fclose( fp );
+
+	const char *srcptr = src;
+	size_t srcsize = dwSize;
+
+	cl_int err;
+	cl_int binary_status;
+	cl_program prog = clCreateProgramWithBinary(context, 1, devices, &srcsize, (const unsigned char**)&srcptr, &binary_status, &err);
+	if (CL_SUCCESS != err) {
+		printf("clCreateProgramWithBinary failed. Error: %d\n", err);
+		exit(1);
+	}
+	if (CL_SUCCESS != binary_status) {
+		printf("Binary status error: %d\n", binary_status);
+	}
+	free(src);
+
+	return prog;
+}
 
 cl_program opencl_compile_source(cl_context context, uint8_t num_devices, cl_device_id *devices, const char *filename, const char *options) {
 	printf("Compiling: %s\n", filename);
@@ -177,6 +286,14 @@ int trigg_init_cl(uint8_t  difficulty, uint8_t *blockNumber) {
 			exit(1);
 		}
 
+#ifdef USE_BINARY
+		cl_program prog = opencl_load_binary(ctx[i].context, 1, &device_id[i], "cl-out_0-0.bin", "");
+		err = clBuildProgram(prog, 1, &device_id[i], NULL, NULL, NULL);
+		if (CL_SUCCESS != err) {
+			printf("clBuildProgram failed. Error: %d\n", err);
+			exit(1);
+		}
+#else
 		cl_program prog_md5 = opencl_compile_source(ctx[i].context, 1, &device_id[i], "../crypto/hash/opencl/cl_md5.cl", "-cl-fp32-correctly-rounded-divide-sqrt");
 		cl_program prog_sha1 = opencl_compile_source(ctx[i].context, 1, &device_id[i], "../crypto/hash/opencl/cl_sha1.cl", "-cl-fp32-correctly-rounded-divide-sqrt");
 		cl_program prog_sha256 = opencl_compile_source(ctx[i].context, 1, &device_id[i], "../crypto/hash/opencl/cl_sha256.cl", "-cl-fp32-correctly-rounded-divide-sqrt");
@@ -190,6 +307,9 @@ int trigg_init_cl(uint8_t  difficulty, uint8_t *blockNumber) {
 			printf("clLinkProgram failed. Error: %d\n", err);
 			exit(1);
 		}
+		// Write the binaries
+		write_binaries(prog, num_devices, 0);
+#endif
 
 		ctx[i].k_peach_build = clCreateKernel(prog, "cl_build_map", &err);
 		if (CL_SUCCESS != err) {
@@ -275,12 +395,12 @@ int trigg_init_cl(uint8_t  difficulty, uint8_t *blockNumber) {
 		if (CL_SUCCESS != err) {
 			printf("%s:%d: clEnqueueReadBuffer failed. Error: %d\n", __FILE__, __LINE__, err);
 		}
-		FILE *fp = fopen("map.dat", "wb");
+		/*FILE *fp = fopen("map.dat", "wb");
 		fwrite(full_map, 1, (size_t)MAP_LENGTH, fp);
 		fclose(fp);
 		free(full_map);
 
-		printf("full map dumped\n");
+		printf("full map dumped\n");*/
 
 
 		ctx[i].d_found = clCreateBuffer(ctx[i].context, CL_MEM_WRITE_ONLY, 4, NULL, &err);
@@ -368,7 +488,6 @@ int main() {
 		cl_int err;
 
 
-#if 0
             	gettimeofday(&t_start, NULL);
 		err = clSetKernelArg(ctx[i].k_peach, 5, 1, &diff);
 		if (CL_SUCCESS != err) {
@@ -435,7 +554,6 @@ int main() {
 			printf("%02x ", ctx[i].seed[j]);
 		}
 		printf("\n");
-#endif
 
 		clReleaseMemObject(ctx[i].d_map);
 		clReleaseMemObject(ctx[i].d_phash);
